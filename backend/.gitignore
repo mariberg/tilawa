@@ -1,0 +1,17 @@
+node_modules/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Keys and certificates
+*.pem
+*.key
+
+# Credential files
+secrets.json
+config/credentials.*
+
+# SAM build artifacts
+.aws-sam/

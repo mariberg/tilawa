@@ -1,0 +1,19 @@
+{
+  "name": "serverless-mvp-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MVP serverless backend on AWS with Lambda, API Gateway, DynamoDB, and Bedrock",
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1025.0",
+    "@aws-sdk/lib-dynamodb": "^3.1025.0",
+    "strands-agents": "^0.0.1"
+  },
+  "devDependencies": {
+    "fast-check": "^4.6.0",
+    "vitest": "^4.1.2"
+  }
+}
