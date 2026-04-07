@@ -133,7 +133,7 @@ Resources:
           - StatusCode: '200'
             ResponseParameters:
               method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Allow-Methods: "'GET, POST, PUT, DELETE, OPTIONS'"
+              method.response.header.Access-Control-Allow-Methods: "'GET, POST, PUT, PATCH, DELETE, OPTIONS'"
               method.response.header.Access-Control-Allow-Headers: "'Content-Type, Authorization, x-api-key'"
       MethodResponses:
         - StatusCode: '200'
