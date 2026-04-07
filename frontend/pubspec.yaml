@@ -10,11 +10,14 @@ dependencies:
   flutter:
     sdk: flutter
   google_fonts: ^6.2.1
+  http: ^1.4.0
+  flutter_typeahead: ^5.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  glados: ^1.1.1
 
 flutter:
   uses-material-design: true
