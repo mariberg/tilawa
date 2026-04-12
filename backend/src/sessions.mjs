@@ -2,153 +2,204 @@ import { randomUUID } from "node:crypto";
 import { putItem, queryItems, updateItem } from "./db.mjs";
 import { invokeAgent } from "./agent.mjs";
 
+const AUTH_BASE_BY_ENV = {
+  prelive: "https://prelive-oauth2.quran.foundation",
+  production: "https://oauth2.quran.foundation",
+};
+
+const API_BASE_BY_ENV = {
+  prelive: "https://apis-prelive.quran.foundation",
+  production: "https://apis.quran.foundation",
+};
+
+// Simple in-memory token cache (lives for the Lambda execution context)
+let cachedToken = null;
+let tokenExpiresAt = 0;
+
+/**
+ * Fetches an OAuth2 access token using client credentials flow.
+ * Caches the token in memory until it expires.
+ */
+async function getAccessToken() {
+  if (cachedToken && Date.now() < tokenExpiresAt) {
+    return cachedToken;
+  }
+
+  const env = process.env.QF_ENV || "prelive";
+  const authBase = AUTH_BASE_BY_ENV[env];
+  const basicAuth = Buffer.from(
+    `${process.env.QF_CLIENT_ID}:${process.env.QF_CLIENT_SECRET}`
+  ).toString("base64");
+
+  const res = await fetch(`${authBase}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      scope: "content",
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error("Quran OAuth token error:", res.status, errBody);
+    throw new Error(`Quran OAuth token request failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  cachedToken = data.access_token;
+  // Refresh 60s before actual expiry to avoid edge cases
+  tokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000;
+  return cachedToken;
+}
+
+/**
+ * Makes an authenticated GET request to the Quran API and returns parsed verses.
+ */
+async function fetchVerses(path) {
+  const env = process.env.QF_ENV || "prelive";
+  const apiBase = API_BASE_BY_ENV[env];
+  const token = await getAccessToken();
+
+  const url = `${apiBase}/content/api/v4/${path}?fields=text_uthmani&translations=131&per_page=50`;
+  console.log("Quran API request:", url);
+  const res = await fetch(url, {
+    headers: {
+      "x-auth-token": token,
+      "x-client-id": process.env.QF_CLIENT_ID,
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("Quran API error:", res.status, body);
+    throw new Error(`Quran API error: ${res.status}`);
+  }
+  const data = await res.json();
+  return (data.verses || []).map((v) => ({
+    verseKey: v.verse_key,
+    arabic: v.text_uthmani || "",
+    translation: v.translations?.[0]?.text?.replace(/<[^>]*>/g, "") || "",
+  }));
+}
+
+/**
+ * Fetches verses for a single Mushaf page number.
+ */
+async function fetchVersesForPage(pageNumber) {
+  return fetchVerses(`verses/by_page/${pageNumber}`);
+}
+
+/**
+ * Fetches verses for a chapter (surah) number.
+ */
+async function fetchVersesForChapter(chapterNumber) {
+  return fetchVerses(`verses/by_chapter/${chapterNumber}`);
+}
+
+/**
+ * Parses a page range string like "50-54" or "50–54" into an array of page numbers.
+ */
+function parsePageRange(pages) {
+  const cleaned = pages.replace(/–/g, "-");
+  const parts = cleaned.split("-").map((s) => parseInt(s.trim(), 10));
+  if (parts.length === 1) return [parts[0]];
+  const [start, end] = parts;
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+
 /**
  * POST /sessions/prepare
- * Generates preparation content (overview + keywords) for a recitation session.
+ * Fetches Quran content, sends it to Bedrock (Nova Pro) with familiarity context,
+ * and returns a 3-bullet overview + 20 ranked keywords.
  */
 export async function prepareSession(body, userId) {
   const { pages, surah, familiarity } = body;
 
-  if (!pages || !surah || !familiarity) {
+  if (!familiarity) {
     return {
       statusCode: 400,
-      body: { error: "Bad Request", message: "pages, surah, and familiarity are required" },
+      body: { error: "Bad Request", message: "familiarity is required" },
     };
   }
 
-  const sessionId = randomUUID();
+  if (!pages && !surah) {
+    return {
+      statusCode: 400,
+      body: { error: "Bad Request", message: "Either pages or surah is required" },
+    };
+  }
 
-  const prompt = [
-    `You are a Quran preparation assistant. Your role is to help a user mentally
-prepare before reciting a portion of the Quran — not to teach, not to lecture,
-but to give a brief, focused mental overview so they can recite with awareness.
+  // Fetch Quran content based on what the frontend sent
+  let allVerses = [];
+  let passageLabel = "";
 
-The user will provide:
+  if (pages) {
+    const pageNumbers = parsePageRange(pages);
+    for (const pg of pageNumbers) {
+      const verses = await fetchVersesForPage(pg);
+      allVerses.push(...verses);
+    }
+    passageLabel = `Pages ${pages}`;
+  } else {
+    // surah is a chapter number (1-114)
+    allVerses = await fetchVersesForChapter(surah);
+    passageLabel = `Surah ${surah}`;
+  }
 
-1. A portion of the Quran (page range ${pages} or Surah name ${surah})
-2. A familiarity level ${familiarity}: "new", "somewhat_familiar", or "well_known"
+  console.log(`Fetched ${allVerses.length} verses for ${passageLabel}`);
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SUMMARY RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Build passage content for the prompt
+  const passageContent = allVerses
+    .map((v) => `[${v.verseKey}] ${v.arabic}\nTranslation: ${v.translation}`)
+    .join("\n\n");
 
-Always produce a concise, high-level summary.
-Focus only on the most important recurring themes.
-Do NOT try to cover everything.
+  const prompt = `You are a Quran study assistant helping a reader prepare for recitation.
 
-Always produce exactly 3 bullet points. No more, no fewer.
-Each bullet point is one concise sentence.
-Order them by importance — most central theme first.
-Return them as a JSON array of 3 strings, not as prose.
+PASSAGE CONTENT (${passageLabel}):
+${passageContent}
 
-The tone should be calm, reverent, and neutral — not academic, not preachy.
+READER FAMILIARITY: ${familiarity}
+- "new" means the reader has never recited this passage before. Focus on foundational vocabulary and core themes.
+- "somewhat_familiar" means the reader has some exposure. Highlight nuances and connections between verses.
+- "well_known" means the reader knows this passage well. Focus on deeper linguistic insights and advanced vocabulary.
 
-Adjust depth based on familiarity level:
+TASK:
+1. Provide exactly 3 bullet points summarizing the key themes of this passage. Each bullet should be one concise sentence.
+2. Provide exactly 20 keywords from the passage, ordered from most important to least important. Each keyword should include the Arabic word, its English translation, a short contextual hint, and a type ("focus" for essential vocabulary, "advanced" for deeper study).
 
-- "new": Write as if the user has never encountered this passage before.
-Use simple language. Focus on the single most dominant theme only.
-Avoid any Arabic terminology without explanation.
-Example tone: "This passage describes the story of a prophet who faced
-rejection from his people, and how he remained patient in the face of that."
-- "somewhat_familiar": Assume the user has read this before but needs a
-reminder. You can reference 2 themes. Slightly more precise language.
-One Arabic term is acceptable if immediately explained.
-Example tone: "This passage returns to the theme of tawakkul — trusting
-in Allah — as the Prophet navigates opposition and doubt from those around him."
-- "well_known": Assume the user knows this passage well and just needs a
-sharp, precise mental anchor before reciting. Be concise and precise.
-Arabic terminology is welcome. Reference up to 3 themes or structural
-elements of the passage.
-Example tone: "This passage moves between the theme of divine mercy (rahmah)
-and the consequences of ingratitude (kufr al-ni'mah), closing with a reminder
-of Allah's complete awareness of what is concealed."
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-KEYWORD RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Produce exactly 20 keywords. No more, no fewer.
-Order them from most important to least important within the passage.
-Each keyword must appear or be directly relevant to the specific passage provided.
-Do not include generic Islamic terms that could apply to any passage.
-
-Each keyword must include:
-
-- arabic: the Arabic word with full diacritics (tashkeel)
-- translation: a short English translation (3–5 words max)
-- hint: one sentence explaining how this word is used in THIS passage specifically
-- type: either "focus" or "advanced" (see below)
-
-Adjust type assignment based on familiarity level:
-
-- "new":
-Assign "focus" to the 10 most common, accessible words.
-Assign "advanced" to the remaining 10.
-Prioritize words the user will encounter frequently in the passage.
-- "somewhat_familiar":
-Assign "focus" to the 12 most thematically significant words.
-Assign "advanced" to the remaining 8.
-Prioritize words that carry theological or narrative weight.
-- "well_known":
-Assign "focus" to the 15 most nuanced or theologically rich words.
-Assign "advanced" to the remaining 5 — these should be rare or
-particularly deep words that even experienced readers may overlook.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-OUTPUT FORMAT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Respond only in valid JSON. No preamble, no explanation, no markdown.
-
+Return ONLY valid JSON with this exact shape, no extra text:
 {
-"overview": [
-"string (one concise sentence)",
-"string (one concise sentence)",
-"string (one concise sentence)"
-
-"keywords": [
-{
-"arabic": "string (with full diacritics)",
-"translation": "string (3–5 words)",
-"hint": "string (one sentence, passage-specific)",
-"type": "focus | advanced"
-}
-// exactly 20 items, ordered most to least important
-]
-}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WHAT TO AVOID
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-- Do not reproduce any Quranic ayat or Arabic text from the Quran itself
-- Do not give tafsir-level detail — this is preparation, not study
-- Do not moralize or give advice to the user
-- Do not include generic words like "Allah", "Islam", "Muslim" as keywords
-unless they appear in a specific and meaningful way in this passage
-- Do not vary the JSON structure based on familiarity level —
-the structure is always identical, only the content depth changes`,
-  ].join("\n");
+  "overview": ["bullet 1", "bullet 2", "bullet 3"],
+  "keywords": [
+    { "arabic": "string", "translation": "string", "hint": "string", "type": "focus | advanced" }
+  ]
+}`;
 
   const raw = await invokeAgent(prompt, userId);
 
   let parsed;
   try {
-    parsed = JSON.parse(raw);
+    // Handle cases where the model wraps JSON in markdown code fences
+    const jsonStr = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    parsed = JSON.parse(jsonStr);
   } catch {
-    parsed = { overview: raw, keywords: [] };
+    parsed = { overview: [raw], keywords: [] };
   }
+
+  const sessionId = randomUUID();
 
   return {
     statusCode: 200,
     body: {
       sessionId,
-      overview: parsed.overview ?? "",
-      keywords: parsed.keywords ?? [],
+      overview: parsed.overview ?? [],
+      keywords: (parsed.keywords ?? []).slice(0, 20),
     },
   };
 }
-
 
 /**
  * POST /sessions
@@ -198,7 +249,6 @@ export async function updateSessionFeeling(sessionId, body, userId) {
     };
   }
 
-  // Find the session by querying user's sessions and matching sessionId
   const sessions = await queryItems(`USER#${userId}`, "SESSION#");
   const session = sessions.find((s) => s.sessionId === sessionId);
 
@@ -224,7 +274,6 @@ export async function updateSessionFeeling(sessionId, body, userId) {
 export async function getRecentSessions(userId) {
   const sessions = await queryItems(`USER#${userId}`, "SESSION#");
 
-  // Sort descending by createdAt (SK contains the timestamp) and take last 2
   const recent = sessions
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 2)

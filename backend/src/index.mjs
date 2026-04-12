@@ -44,12 +44,15 @@ export async function handler(event, context) {
     }
 
     // All other errors → 500 with generic message (no internal details)
+    console.error("Unhandled error:", error);
     return {
       statusCode: 500,
       headers: CORS_HEADERS,
       body: JSON.stringify({
         error: "Internal Server Error",
         message: "An unexpected error occurred",
+        // TODO: remove debug field before production
+        debug: error.message,
       }),
     };
   }

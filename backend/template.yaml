@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Serverless MVP Backend — API Gateway + Lambda + DynamoDB + Bedrock
+Description: Tilawa Backend — API Gateway + Lambda + DynamoDB + Bedrock
 
 Parameters:
   StageName:
@@ -8,8 +8,23 @@ Parameters:
     Description: Deployment stage name
   ProjectName:
     Type: String
-    Default: serverless-mvp
+    Default: tilawa
     Description: Project name used for resource naming
+  BedrockRoleArn:
+    Type: String
+    NoEcho: true
+    # Cross-account role assumption used to access Bedrock Nova Lite quota
+    # on the root account while keeping all other infrastructure isolated
+    # in the member account. Temporary measure pending quota increase approval.
+    Description: ARN of the cross-account Bedrock access role (entered at deploy time)
+  QuranClientId:
+    Type: String
+    NoEcho: true
+    Description: Quran Foundation OAuth2 client ID
+  QuranClientSecret:
+    Type: String
+    NoEcho: true
+    Description: Quran Foundation OAuth2 client secret
 
 Resources:
 
@@ -75,6 +90,14 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: '*'
+        - PolicyName: AssumeBedrockRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource: !Ref BedrockRoleArn
 
   # ---- Lambda Function ----
   LambdaFunction:
@@ -84,18 +107,27 @@ Resources:
       Runtime: nodejs22.x
       Handler: src/index.handler
       Role: !GetAtt LambdaRole.Arn
+      Code:
+        ZipFile: |
+          export async function handler() {
+            return { statusCode: 200, body: JSON.stringify({ message: "Placeholder - upload real code via Lambda console" }) };
+          }
       Timeout: 30
       MemorySize: 256
       Environment:
         Variables:
           TABLE_NAME: !Ref DynamoDBTable
+          QF_CLIENT_ID: !Ref QuranClientId
+          QF_CLIENT_SECRET: !Ref QuranClientSecret
+          QF_ENV: production
+          BEDROCK_ROLE_ARN: !Ref BedrockRoleArn
 
   # ---- API Gateway REST API ----
   RestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Sub '${ProjectName}-api-${StageName}'
-      Description: Serverless MVP Backend REST API
+      Description: Tilawa Backend REST API
 
   ProxyResource:
     Type: AWS::ApiGateway::Resource

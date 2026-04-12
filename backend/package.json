@@ -8,9 +8,10 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1028.0",
     "@aws-sdk/client-dynamodb": "^3.1025.0",
-    "@aws-sdk/lib-dynamodb": "^3.1025.0",
-    "strands-agents": "^0.0.1"
+    "@aws-sdk/client-sts": "^3.1029.0",
+    "@aws-sdk/lib-dynamodb": "^3.1025.0"
   },
   "devDependencies": {
     "fast-check": "^4.6.0",

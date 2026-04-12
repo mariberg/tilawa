@@ -15,3 +15,5 @@ config/credentials.*
 
 # SAM build artifacts
 .aws-sam/
+
+*.zip
