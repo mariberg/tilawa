@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../models/surah.dart';
 import '../services/surah_service.dart';
+import '../services/session_service.dart';
 import '../widgets/familiarity_pills.dart';
 
 /// Filters [surahs] by case-insensitive substring match on [nameSimple].
@@ -28,11 +29,14 @@ class EntryScreen extends StatefulWidget {
 
 class _EntryScreenState extends State<EntryScreen> {
   final SurahService _surahService = SurahService();
+  final SessionService _sessionService = SessionService();
   final TextEditingController _textController = TextEditingController();
 
   List<Surah>? _surahs;
   String? _error;
   bool _isLoading = true;
+  bool _isPreparing = false;
+  String _familiarity = 'New';
 
   @override
   void initState() {
@@ -59,6 +63,67 @@ class _EntryScreenState extends State<EntryScreen> {
   void dispose() {
     _textController.dispose();
     super.dispose();
+  }
+
+  /// Validates page input. Only accepts a single number (e.g. "50")
+  /// or a range with a dash (e.g. "50-54" or "50–54"). Returns the
+  /// normalized pages string (using "-") or null if input is not pages.
+  /// Throws if the format starts with a digit but is invalid.
+  String? _parsePages(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return null;
+    // Not a page input if it doesn't start with a digit
+    if (!RegExp(r'^\d').hasMatch(trimmed)) return null;
+    // Single page number
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) return trimmed;
+    // Range like "50-54" or "50–54" (with optional spaces around dash)
+    final rangeMatch = RegExp(r'^(\d+)\s*[-–]\s*(\d+)$').firstMatch(trimmed);
+    if (rangeMatch != null) {
+      return '${rangeMatch.group(1)}-${rangeMatch.group(2)}';
+    }
+    // Anything else starting with a digit is invalid (commas, spaces, etc.)
+    throw FormatException(
+      'Invalid page format. Use a single page (e.g. 50) or a range (e.g. 50-54).',
+    );
+  }
+
+  Future<void> _prepare() async {
+    final input = _textController.text.trim();
+    if (input.isEmpty) {
+      setState(() => _error = 'Please enter pages or a surah name.');
+      return;
+    }
+
+    setState(() {
+      _error = null;
+      _isPreparing = true;
+    });
+
+    try {
+      final pages = _parsePages(input);
+      final surah = pages == null ? input : null;
+
+      final response = await _sessionService.prepare(
+        pages: pages,
+        surah: surah,
+        familiarity: _familiarity,
+      );
+
+      if (!mounted) return;
+      Navigator.pushNamed(context, '/prep', arguments: {
+        'sessionId': response.sessionId,
+        'overview': response.overview,
+        'keywords': response.keywords.map((k) => k.toJson()).toList(),
+      });
+    } on FormatException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isPreparing = false);
+    }
   }
 
   @override
@@ -195,7 +260,9 @@ class _EntryScreenState extends State<EntryScreen> {
               // Familiarity
               Text('FAMILIARITY', style: AppTextStyles.label),
               const SizedBox(height: 10),
-              const FamiliarityPills(),
+              FamiliarityPills(
+                onChanged: (value) => _familiarity = value,
+              ),
               const SizedBox(height: 28),
               // Recent sessions
               Text('CONTINUE WHERE YOU LEFT OFF', style: AppTextStyles.label),
@@ -213,7 +280,7 @@ class _EntryScreenState extends State<EntryScreen> {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pushNamed(context, '/prep'),
+                  onPressed: _isPreparing ? null : _prepare,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.primaryLight,
@@ -226,7 +293,16 @@ class _EntryScreenState extends State<EntryScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text('Prepare'),
+                  child: _isPreparing
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primaryLight,
+                          ),
+                        )
+                      : const Text('Prepare'),
                 ),
               ),
               const SizedBox(height: 24),

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
 class FamiliarityPills extends StatefulWidget {
-  const FamiliarityPills({super.key});
+  final ValueChanged<String>? onChanged;
+
+  const FamiliarityPills({super.key, this.onChanged});
 
   @override
   State<FamiliarityPills> createState() => _FamiliarityPillsState();
@@ -22,7 +24,10 @@ class _FamiliarityPillsState extends State<FamiliarityPills> {
         return Padding(
           padding: EdgeInsets.only(right: i < _options.length - 1 ? 8 : 0),
           child: GestureDetector(
-            onTap: () => setState(() => _selected = i),
+            onTap: () {
+              setState(() => _selected = i);
+              widget.onChanged?.call(_options[i]);
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(

@@ -1,5 +1,6 @@
 // App entry point — MaterialApp with routes and theme.
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme/app_colors.dart';
 import 'screens/auth_screen.dart';
 import 'screens/entry_screen.dart';
@@ -7,7 +8,8 @@ import 'screens/prep_screen.dart';
 import 'screens/recitation_screen.dart';
 import 'screens/feedback_screen.dart';
 
-void main() {
+Future<void> main() async {
+  await dotenv.load();
   runApp(const QuranPrepApp());
 }
 

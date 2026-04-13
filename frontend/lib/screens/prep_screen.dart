@@ -15,40 +15,23 @@ class PrepScreen extends StatefulWidget {
 class _PrepScreenState extends State<PrepScreen> {
   int currentIndex = 0;
   bool isFlipped = false;
-  // Track action state per card: 0=none, 1=known, 2=notSure, 3=review
   late List<int> cardStates;
 
-  final List<Map<String, dynamic>> keywords = [
-    {
-      'arabic': 'صَبْر',
-      'translation': 'Patience / Steadfastness',
-      'hint': 'Used when enduring hardship with faith',
-      'type': 'focus',
-    },
-    {
-      'arabic': 'تَقْوَى',
-      'translation': 'God-consciousness / Piety',
-      'hint': 'A state of inner awareness and reverence',
-      'type': 'focus',
-    },
-    {
-      'arabic': 'اِسْتِكْبَار',
-      'translation': 'Arrogance / Pride',
-      'hint': 'Rejecting truth out of self-importance',
-      'type': 'advanced',
-    },
-    {
-      'arabic': 'هِدَايَة',
-      'translation': 'Guidance',
-      'hint': 'Divine direction toward truth',
-      'type': 'focus',
-    },
-  ];
+  String _overview = '';
+  List<Map<String, dynamic>> keywords = [];
 
   @override
-  void initState() {
-    super.initState();
-    cardStates = List.filled(keywords.length, 0);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args != null && keywords.isEmpty) {
+      final overviewList = args['overview'] as List<String>? ?? [];
+      _overview = overviewList.join(' ');
+      keywords =
+          (args['keywords'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      cardStates = List.filled(keywords.length, 0);
+    }
   }
 
   void _onCardTap() {
@@ -114,48 +97,61 @@ class _PrepScreenState extends State<PrepScreen> {
               const SizedBox(height: 16),
               // Overview
               Text(
-                'This passage discusses trials faced by believers and the enduring consequences of turning away from guidance.',
+                _overview.isNotEmpty
+                    ? _overview
+                    : 'Preparing your session...',
                 style: AppTextStyles.displayBody,
               ),
               const SizedBox(height: 20),
               // Keywords header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('KEYWORDS', style: AppTextStyles.label),
-                  Text(
-                    '${currentIndex + 1} of ${keywords.length}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              // Keyword card
-              Expanded(
-                child: KeywordCard(
-                  key: ValueKey('$currentIndex-$isFlipped'),
-                  keyword: keywords[currentIndex],
-                  isFlipped: isFlipped,
-                  onTap: _onCardTap,
+              if (keywords.isNotEmpty) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('KEYWORDS', style: AppTextStyles.label),
+                    Text(
+                      '${currentIndex + 1} of ${keywords.length}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              // Action buttons (shown when flipped)
-              if (isFlipped)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      _actionBtn('✓ Known', 1),
-                      const SizedBox(width: 8),
-                      _actionBtn('? Not sure', 2),
-                      const SizedBox(width: 8),
-                      _actionBtn('↻ Review', 3),
-                    ],
+                const SizedBox(height: 10),
+                // Keyword card
+                Expanded(
+                  child: KeywordCard(
+                    key: ValueKey('$currentIndex-$isFlipped'),
+                    keyword: keywords[currentIndex],
+                    isFlipped: isFlipped,
+                    onTap: _onCardTap,
                   ),
                 ),
-              // Dot indicator
-              DotIndicator(count: keywords.length, activeIndex: currentIndex),
+                const SizedBox(height: 12),
+                // Action buttons (shown when flipped)
+                if (isFlipped)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        _actionBtn('✓ Known', 1),
+                        const SizedBox(width: 8),
+                        _actionBtn('? Not sure', 2),
+                        const SizedBox(width: 8),
+                        _actionBtn('↻ Review', 3),
+                      ],
+                    ),
+                  ),
+                // Dot indicator
+                DotIndicator(count: keywords.length, activeIndex: currentIndex),
+              ] else ...[
+                const Expanded(
+                  child: Center(
+                    child: Text(
+                      'No keywords available.',
+                      style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
             ],
           ),
