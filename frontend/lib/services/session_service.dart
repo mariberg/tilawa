@@ -4,8 +4,13 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/session_response.dart';
+import 'auth_service.dart';
 
 class SessionService {
+  final AuthService _authService;
+
+  SessionService({required AuthService authService})
+      : _authService = authService;
   Future<SessionResponse> prepare({
     String? pages,
     String? surah,
@@ -43,12 +48,12 @@ class SessionService {
     final encodedBody = jsonEncode(body);
     final headers = {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer demo-user-1',
+      'Authorization': _authService.getAuthHeader(),
       'x-api-key': apiKey,
     };
 
     print('[SessionService] POST $url');
-    print('[SessionService] Headers: $headers');
+    print('[SessionService] Headers: ${headers.map((k, v) => MapEntry(k, k == 'x-api-key' ? '***' : v))}');
     print('[SessionService] Body: $encodedBody');
 
     final httpClient = client ?? http.Client();

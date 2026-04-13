@@ -1,5 +1,6 @@
 // Authentication screen — username and password login.
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
@@ -12,6 +13,36 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   bool _obscurePassword = true;
+
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
+
+  String? _errorMessage;
+  bool _isButtonEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController.addListener(_onFieldChanged);
+    _passwordController.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    final enabled =
+        _usernameController.text.isNotEmpty && _passwordController.text.isNotEmpty;
+    setState(() {
+      _isButtonEnabled = enabled;
+      _errorMessage = null;
+    });
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
@@ -54,6 +85,7 @@ class _AuthScreenState extends State<AuthScreen> {
               Text('USERNAME', style: AppTextStyles.label),
               const SizedBox(height: 8),
               TextField(
+                controller: _usernameController,
                 style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
                 cursorColor: AppColors.primary,
                 decoration: _inputDecoration('Enter your username'),
@@ -63,6 +95,7 @@ class _AuthScreenState extends State<AuthScreen> {
               Text('PASSWORD', style: AppTextStyles.label),
               const SizedBox(height: 8),
               TextField(
+                controller: _passwordController,
                 obscureText: _obscurePassword,
                 style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
                 cursorColor: AppColors.primary,
@@ -85,13 +118,34 @@ class _AuthScreenState extends State<AuthScreen> {
                   style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w500),
                 ),
               ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(fontSize: 13, color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const Spacer(),
               // Sign in button
               SizedBox(
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+                  onPressed: _isButtonEnabled
+                      ? () {
+                          final username = _usernameController.text;
+                          final password = _passwordController.text;
+                          if (_authService.validate(username, password)) {
+                            _authService.setUser(username);
+                            Navigator.pushReplacementNamed(context, '/home', arguments: _authService);
+                          } else {
+                            setState(() {
+                              _errorMessage = 'Invalid username or password';
+                            });
+                          }
+                        }
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.primaryLight,

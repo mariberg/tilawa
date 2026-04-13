@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../models/surah.dart';
 import '../services/surah_service.dart';
+import '../services/auth_service.dart';
 import '../services/session_service.dart';
 import '../widgets/familiarity_pills.dart';
 
@@ -28,8 +29,11 @@ class EntryScreen extends StatefulWidget {
 }
 
 class _EntryScreenState extends State<EntryScreen> {
+  late AuthService _authService;
+  late SessionService _sessionService;
+  bool _didExtractArgs = false;
+
   final SurahService _surahService = SurahService();
-  final SessionService _sessionService = SessionService();
   final TextEditingController _textController = TextEditingController();
 
   List<Surah>? _surahs;
@@ -42,6 +46,16 @@ class _EntryScreenState extends State<EntryScreen> {
   void initState() {
     super.initState();
     _loadSurahs();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_didExtractArgs) {
+      _authService = ModalRoute.of(context)!.settings.arguments as AuthService;
+      _sessionService = SessionService(authService: _authService);
+      _didExtractArgs = true;
+    }
   }
 
   Future<void> _loadSurahs() async {
@@ -142,7 +156,7 @@ class _EntryScreenState extends State<EntryScreen> {
                 style: AppTextStyles.h1,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               // Typeahead surah search
               TypeAheadField<Surah>(
                 controller: _textController,
