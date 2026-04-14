@@ -5,8 +5,10 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../models/surah.dart';
 import '../services/surah_service.dart';
+import '../models/recent_session.dart';
 import '../services/auth_service.dart';
 import '../services/session_service.dart';
+import '../utils/date_utils.dart';
 import '../widgets/familiarity_pills.dart';
 
 /// Filters [surahs] by case-insensitive substring match on [nameSimple].
@@ -43,6 +45,10 @@ class _EntryScreenState extends State<EntryScreen> {
   bool _isPreparing = false;
   String _familiarity = 'New';
 
+  List<RecentSession>? _recentSessions;
+  bool _isLoadingRecent = true;
+  String? _recentError;
+
   @override
   void initState() {
     super.initState();
@@ -65,7 +71,25 @@ class _EntryScreenState extends State<EntryScreen> {
       }
       _authService = args;
       _sessionService = SessionService(authService: _authService!);
+      _loadRecentSessions();
       _didExtractArgs = true;
+    }
+  }
+
+  Future<void> _loadRecentSessions() async {
+    try {
+      final sessions = await _sessionService!.fetchRecentSessions();
+      if (!mounted) return;
+      setState(() {
+        _recentSessions = sessions;
+        _isLoadingRecent = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _recentError = 'Could not load recent sessions.';
+        _isLoadingRecent = false;
+      });
     }
   }
 
@@ -296,13 +320,60 @@ class _EntryScreenState extends State<EntryScreen> {
               // Recent sessions
               Text('CONTINUE WHERE YOU LEFT OFF', style: AppTextStyles.label),
               const SizedBox(height: 12),
-              _recentRow('Pages 50–54', 'Yesterday'),
-              const Divider(
-                height: 1,
-                thickness: 0.5,
-                color: AppColors.borderLight,
-              ),
-              _recentRow('Pages 12–15', '3 days ago'),
+              if (_isLoadingRecent)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                )
+              else if (_recentError != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    _recentError!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                )
+              else if (_recentSessions == null || _recentSessions!.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'No recent sessions',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                )
+              else
+                ..._recentSessions!.asMap().entries.expand((entry) {
+                  final session = entry.value;
+                  final isLast = entry.key == _recentSessions!.length - 1;
+                  return [
+                    _recentRow(
+                      session.pages,
+                      formatRelativeDate(session.createdAt),
+                      showRevisit: session.feeling == 'revisit',
+                    ),
+                    if (!isLast)
+                      const Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: AppColors.borderLight,
+                      ),
+                  ];
+                }),
               const Spacer(),
               // Prepare button
               SizedBox(
@@ -342,15 +413,41 @@ class _EntryScreenState extends State<EntryScreen> {
     );
   }
 
-  static Widget _recentRow(String title, String date) {
+  static Widget _recentRow(String title, String date,
+      {bool showRevisit = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textPrimary),
+              ),
+              if (showRevisit) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Revisit',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           Text(
             date,

@@ -4,33 +4,33 @@
 
 - [x] 1.1 Create `lib/models/keyword_selection_record.dart` with `arabic`, `category` fields, `toJson()`, and `fromJson()` factory
 - [x] 1.2 Create `lib/models/session_result_payload.dart` with `pages`, `surah`, `keywords` fields, `toJson()`, and `fromJson()` factory
-- [~] 1.3 Write unit tests for `KeywordSelectionRecord` JSON serialization
-- [~] 1.4 Write unit tests for `SessionResultPayload` JSON serialization
-- [~] 1.5 Write property test: SessionResultPayload serialization round trip (Property 9)
+- [ ] 1.3 Write unit tests for `KeywordSelectionRecord` JSON serialization
+- [ ] 1.4 Write unit tests for `SessionResultPayload` JSON serialization
+- [ ] 1.5 Write property test: SessionResultPayload serialization round trip (Property 9)
 
 ## Task 2: Implement KeywordDisplayManager
 
 - [x] 2.1 Create `lib/services/keyword_display_manager.dart` with `displayLimit` constant, constructor that splits full list into visible/reserve, and `replaceKnown(index)` method
-- [~] 2.2 Write property test: Initial visible set is first min(displayLimit, length) keywords (Property 1)
-- [~] 2.3 Write property test: replaceKnown with reserve inserts next reserve at same position (Property 2)
-- [~] 2.4 Write property test: replaceKnown without reserve shrinks visible by one (Property 3)
-- [~] 2.5 Write property test: Visible and reserve partition the full list in original order (Property 4)
-- [~] 2.6 Write unit tests for edge cases: 0 keywords, exactly 7 keywords, displayLimit constant equals 7
+- [ ] 2.2 Write property test: Initial visible set is first min(displayLimit, length) keywords (Property 1)
+- [ ] 2.3 Write property test: replaceKnown with reserve inserts next reserve at same position (Property 2)
+- [ ] 2.4 Write property test: replaceKnown without reserve shrinks visible by one (Property 3)
+- [ ] 2.5 Write property test: Visible and reserve partition the full list in original order (Property 4)
+- [ ] 2.6 Write unit tests for edge cases: 0 keywords, exactly 7 keywords, displayLimit constant equals 7
 
 ## Task 3: Implement SelectionTracker
 
 - [x] 3.1 Create `lib/services/selection_tracker.dart` with `record()`, `getRecords()`, `count`, and `reset()` methods
-- [~] 3.2 Write property test: Recording a category stores the correct category (Property 5)
-- [~] 3.3 Write property test: All recorded keywords are retrievable (Property 6)
-- [~] 3.4 Write property test: One record per unique arabic string (Property 7)
-- [~] 3.5 Write property test: Last-write-wins for duplicate recordings (Property 8)
-- [~] 3.6 Write unit tests for edge cases: empty tracker initialization, reset clears records
+- [ ] 3.2 Write property test: Recording a category stores the correct category (Property 5)
+- [ ] 3.3 Write property test: All recorded keywords are retrievable (Property 6)
+- [ ] 3.4 Write property test: One record per unique arabic string (Property 7)
+- [ ] 3.5 Write property test: Last-write-wins for duplicate recordings (Property 8)
+- [ ] 3.6 Write unit tests for edge cases: empty tracker initialization, reset clears records
 
 ## Task 4: Add submitResults method to SessionService
 
 - [x] 4.1 Add `submitResults()` method to `lib/services/session_service.dart` that POSTs `SessionResultPayload` to `{BASE_URL}/sessions/complete`
-- [~] 4.2 Write property test: Non-200 status codes throw with status code in message (Property 10)
-- [~] 4.3 Write unit tests: correct URL, auth headers, network error propagation
+- [ ] 4.2 Write property test: Non-200 status codes throw with status code in message (Property 10)
+- [ ] 4.3 Write unit tests: correct URL, auth headers, network error propagation
 
 ## Task 5: Refactor PrepScreen to use KeywordDisplayManager and SelectionTracker
 

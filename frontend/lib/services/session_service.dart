@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../models/recent_session.dart';
 import '../models/session_response.dart';
 import '../models/session_result_payload.dart';
 import 'auth_service.dart';
@@ -187,6 +188,55 @@ class SessionService {
         throw Exception(
             'Submit feeling failed: status ${response.statusCode}');
       }
+    } finally {
+      if (client == null) {
+        httpClient.close();
+      }
+    }
+  }
+
+  Future<List<RecentSession>> fetchRecentSessions({
+    http.Client? client,
+  }) async {
+    final baseUrl = dotenv.env['BASE_URL'];
+    if (baseUrl == null || baseUrl.isEmpty) {
+      throw Exception('BASE_URL is not configured');
+    }
+
+    final apiKey = dotenv.env['API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('API_KEY is not configured');
+    }
+
+    final url = '$baseUrl/sessions/recent';
+    final headers = {
+      'Authorization': _authService.getAuthHeader(),
+      'x-api-key': apiKey,
+    };
+
+    print('[SessionService] GET $url');
+    print('[SessionService] Headers: ${headers.map((k, v) => MapEntry(k, k == 'x-api-key' ? '***' : v))}');
+
+    final httpClient = client ?? http.Client();
+    try {
+      final response = await httpClient.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+
+      print('[SessionService] Response status: ${response.statusCode}');
+      print('[SessionService] Response headers: ${response.headers}');
+      print('[SessionService] Response body: ${response.body}');
+
+      if (response.statusCode != 200) {
+        throw Exception(
+            'Fetch recent sessions failed: status ${response.statusCode}');
+      }
+
+      final List<dynamic> jsonList = jsonDecode(response.body) as List<dynamic>;
+      return jsonList
+          .map((e) => RecentSession.fromJson(e as Map<String, dynamic>))
+          .toList();
     } finally {
       if (client == null) {
         httpClient.close();
