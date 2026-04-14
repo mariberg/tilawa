@@ -111,6 +111,18 @@ function parsePageRange(pages) {
 }
 
 /**
+ * Removes keywords whose arabic field matches an entry in the known set.
+ * Preserves original ordering.
+ *
+ * @param {Array<{arabic: string, translation: string, hint: string, type: string}>} keywords - LLM keywords
+ * @param {Set<string>} knownArabicSet - Set of known Arabic strings
+ * @returns {Array<{arabic: string, translation: string, hint: string, type: string}>} Filtered keywords
+ */
+export function filterKnownKeywords(keywords, knownArabicSet) {
+  return keywords.filter(k => !knownArabicSet.has(k.arabic));
+}
+
+/**
  * POST /sessions/prepare
  * Fetches Quran content, sends it to Bedrock (Nova Pro) with familiarity context,
  * and returns a 3-bullet overview + 20 ranked keywords.
@@ -130,6 +142,15 @@ export async function prepareSession(body, userId) {
       statusCode: 400,
       body: { error: "Bad Request", message: "Either pages or surah is required" },
     };
+  }
+
+  // Fetch user's known keywords for filtering (graceful degradation on failure)
+  let knownArabicSet = new Set();
+  try {
+    const knownItems = await queryItems(`USER#${userId}`, "KEYWORD#");
+    knownArabicSet = new Set(knownItems.map(item => item.arabic));
+  } catch (err) {
+    console.error("Failed to fetch known keywords, continuing with empty set:", err);
   }
 
   // Fetch Quran content based on what the frontend sent
@@ -196,7 +217,7 @@ Return ONLY valid JSON with this exact shape, no extra text:
     body: {
       sessionId,
       overview: parsed.overview ?? [],
-      keywords: (parsed.keywords ?? []).slice(0, 20),
+      keywords: filterKnownKeywords(parsed.keywords ?? [], knownArabicSet).slice(0, 20),
     },
   };
 }
@@ -308,14 +329,13 @@ export async function updateSessionFeeling(sessionId, body, userId) {
 
 /**
  * GET /sessions/recent
- * Returns the last 2 sessions for the user.
+ * Returns all sessions for the user, sorted newest first.
  */
 export async function getRecentSessions(userId) {
   const sessions = await queryItems(`USER#${userId}`, "SESSION#");
 
   const recent = sessions
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 2)
     .map(({ sessionId, pages, surah, feeling, createdAt }) => ({
       sessionId,
       pages,
