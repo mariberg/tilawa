@@ -9,7 +9,10 @@ import '../models/recent_session.dart';
 import '../services/auth_service.dart';
 import '../services/session_service.dart';
 import '../utils/date_utils.dart';
+import '../utils/page_utils.dart';
 import '../widgets/familiarity_pills.dart';
+import '../widgets/revisit_bottom_sheet.dart';
+import '../main.dart' show routeObserver;
 
 /// Filters [surahs] by case-insensitive substring match on [nameSimple].
 /// Returns an empty list when [query] is empty or starts with a digit
@@ -30,7 +33,7 @@ class EntryScreen extends StatefulWidget {
   State<EntryScreen> createState() => _EntryScreenState();
 }
 
-class _EntryScreenState extends State<EntryScreen> {
+class _EntryScreenState extends State<EntryScreen> with RouteAware {
   AuthService? _authService;
   SessionService? _sessionService;
   bool _didExtractArgs = false;
@@ -58,6 +61,11 @@ class _EntryScreenState extends State<EntryScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Subscribe to route observer so we know when this screen becomes visible.
+    final route = ModalRoute.of(context);
+    if (route is ModalRoute<void>) {
+      routeObserver.subscribe(this, route);
+    }
     if (!_didExtractArgs) {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args == null || args is! AuthService) {
@@ -110,8 +118,105 @@ class _EntryScreenState extends State<EntryScreen> {
 
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _textController.dispose();
     super.dispose();
+  }
+
+  /// Called when this route becomes the top route again (e.g. after popUntil).
+  @override
+  void didPopNext() {
+    // Re-fetch recent sessions and clear the form.
+    setState(() {
+      _isLoadingRecent = true;
+      _recentError = null;
+      _textController.clear();
+      _selectedSurah = null;
+      _error = null;
+    });
+    _loadRecentSessions();
+  }
+
+  /// Returns the [nameSimple] of the surah with the given [id],
+  /// or null if [_surahs] is not loaded or the id is not found.
+  String? _surahName(int id) {
+    final idx = _surahs?.indexWhere((s) => s.id == id) ?? -1;
+    return idx >= 0 ? _surahs![idx].nameSimple : null;
+  }
+
+  /// Returns the [nameSimple] of the next surah after [currentId],
+  /// wrapping from 114 back to 1. Returns null if not found.
+  String? _nextSurahName(int currentId) {
+    final nextId = currentId >= 114 ? 1 : currentId + 1;
+    return _surahName(nextId);
+  }
+
+  /// Computes the display title for a recent session row.
+  /// Page sessions show the pages string; surah sessions show the
+  /// looked-up nameSimple or a fallback "Surah {id}".
+  String _sessionTitle(RecentSession session) {
+    if (session.pages != null) return session.pages!;
+    if (session.surah != null) {
+      return _surahName(session.surah!) ?? 'Surah ${session.surah}';
+    }
+    return 'Unknown session';
+  }
+
+  Future<void> _onRecentSessionTap(RecentSession session) async {
+    if (session.pages != null) {
+      _handlePageSessionTap(session);
+    } else if (session.surah != null) {
+      _handleSurahSessionTap(session);
+    }
+  }
+
+  void _handlePageSessionTap(RecentSession session) async {
+    final parsed = parsePageRange(session.pages!);
+    if (parsed == null) return;
+
+    if (session.feeling == 'revisit') {
+      final choice = await showModalBottomSheet<String>(
+        context: context,
+        builder: (_) => const RevisitBottomSheet(
+          revisitLabel: 'Revisit same pages',
+          moveOnLabel: 'Move on',
+        ),
+      );
+      if (choice == 'revisit') {
+        _textController.text = formatPageRange(parsed.start, parsed.end);
+      } else if (choice == 'moveOn') {
+        _textController.text =
+            nextPageRange(parsed.start, parsed.end, parsed.span);
+      }
+    } else {
+      _textController.text =
+          nextPageRange(parsed.start, parsed.end, parsed.span);
+    }
+  }
+
+  void _handleSurahSessionTap(RecentSession session) async {
+    if (session.feeling == 'revisit') {
+      final currentName = _surahName(session.surah!);
+      if (currentName == null) return;
+      final nextName = _nextSurahName(session.surah!);
+
+      final choice = await showModalBottomSheet<String>(
+        context: context,
+        builder: (_) => const RevisitBottomSheet(
+          revisitLabel: 'Revisit same surah',
+          moveOnLabel: 'Move on',
+        ),
+      );
+      if (choice == 'revisit') {
+        _textController.text = currentName;
+      } else if (choice == 'moveOn' && nextName != null) {
+        _textController.text = nextName;
+      }
+    } else {
+      final nextName = _nextSurahName(session.surah!);
+      if (nextName == null) return;
+      _textController.text = nextName;
+    }
   }
 
   /// Validates page input. Only accepts a single number (e.g. "50")
@@ -159,7 +264,7 @@ class _EntryScreenState extends State<EntryScreen> {
       );
 
       if (!mounted) return;
-      Navigator.pushNamed(context, '/prep', arguments: {
+      await Navigator.pushNamed(context, '/prep', arguments: {
         'sessionId': response.sessionId,
         'overview': response.overview,
         'keywords': response.keywords.map((k) => k.toJson()).toList(),
@@ -361,11 +466,7 @@ class _EntryScreenState extends State<EntryScreen> {
                   final session = entry.value;
                   final isLast = entry.key == _recentSessions!.length - 1;
                   return [
-                    _recentRow(
-                      session.pages,
-                      formatRelativeDate(session.createdAt),
-                      showRevisit: session.feeling == 'revisit',
-                    ),
+                    _recentRow(session),
                     if (!isLast)
                       const Divider(
                         height: 1,
@@ -413,47 +514,50 @@ class _EntryScreenState extends State<EntryScreen> {
     );
   }
 
-  static Widget _recentRow(String title, String date,
-      {bool showRevisit = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.textPrimary),
-              ),
-              if (showRevisit) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Revisit',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary,
+  Widget _recentRow(RecentSession session) {
+    return InkWell(
+      onTap: () => _onRecentSessionTap(session),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _sessionTitle(session),
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+                if (session.feeling == 'revisit') ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Revisit',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
-          ),
-          Text(
-            date,
-            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-          ),
-        ],
+            ),
+            Text(
+              formatRelativeDate(session.createdAt),
+              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ],
+        ),
       ),
     );
   }

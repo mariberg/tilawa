@@ -8,6 +8,10 @@ import 'screens/prep_screen.dart';
 import 'screens/recitation_screen.dart';
 import 'screens/feedback_screen.dart';
 
+/// Global route observer so screens can react when they become visible again.
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
+
 Future<void> main() async {
   await dotenv.load();
   runApp(const QuranPrepApp());
@@ -21,6 +25,7 @@ class QuranPrepApp extends StatelessWidget {
     return MaterialApp(
       title: 'Quran Prep',
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [routeObserver],
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.background,

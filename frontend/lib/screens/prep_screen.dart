@@ -169,11 +169,21 @@ class _PrepScreenState extends State<PrepScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text(
-                _overview.isNotEmpty
-                    ? _overview
-                    : 'Preparing your session...',
-                style: AppTextStyles.displayBody,
+              Flexible(
+                flex: 0,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.25,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      _overview.isNotEmpty
+                          ? _overview
+                          : 'Preparing your session...',
+                      style: AppTextStyles.displayBody,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
               if (hasKeywords) ...[

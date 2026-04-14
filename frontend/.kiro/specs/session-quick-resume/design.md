@@ -302,3 +302,130 @@ The bottom sheet returns a `String?` via `Navigator.pop`:
 - `'revisit'` — user chose to revisit same content
 - `'moveOn'` — user chose to move on
 - `null` — user dismissed without choosing
+
+
+## Correctness Properties
+
+*A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
+
+### Property 1: RecentSession JSON round-trip
+
+*For any* valid `RecentSession` instance (with either a non-null `pages` string or a non-null `surah` int, a feeling from `{smooth, struggled, revisit}`, and a valid DateTime), serializing via `toJson` and deserializing via `RecentSession.fromJson` should produce an equivalent object with identical field values.
+
+**Validates: Requirements 1.3, 1.4**
+
+### Property 2: Missing pages and surah throws FormatException
+
+*For any* JSON map that contains a valid `sessionId`, `feeling`, and `createdAt` but has both `pages` and `surah` as null (or absent), calling `RecentSession.fromJson` should throw a `FormatException`.
+
+**Validates: Requirements 1.5**
+
+### Property 3: Page range parsing round-trip
+
+*For any* pair of positive integers (start, end) where start <= end, formatting them as a page range string (either "Pages {start}–{end}" or "{start}-{end}") and then parsing with `parsePageRange` should return the same start and end values, with span equal to end - start + 1.
+
+**Validates: Requirements 3.1, 3.2, 3.5**
+
+### Property 4: Invalid pages strings return null
+
+*For any* string that does not match a valid page range pattern (e.g. random alphabetic strings, empty strings, strings with multiple dashes), `parsePageRange` should return null.
+
+**Validates: Requirements 3.4**
+
+### Property 5: Next page range arithmetic
+
+*For any* positive integers start, end, span where span = end - start + 1, calling `nextPageRange(start, end, span)` should produce a string that, when parsed, yields a start of `end + 1` and an end of `end + span`, with the same span as the original.
+
+**Validates: Requirements 4.1**
+
+### Property 6: Next surah wrapping
+
+*For any* surah ID in the range 1–114, the next surah ID should equal `id + 1` when `id < 114`, and should equal `1` when `id == 114`. The result should always be in the range 1–114.
+
+**Validates: Requirements 5.1, 5.2**
+
+### Property 7: Session title computation
+
+*For any* `RecentSession` and a surah list containing all 114 surahs, the computed session title should equal `session.pages` when pages is non-null, or the matching surah's `nameSimple` when surah is non-null and found in the list.
+
+**Validates: Requirements 2.1, 2.2**
+
+### Property 8: Non-revisit tap pre-fills next content
+
+*For any* `RecentSession` with feeling `smooth` or `struggled`, and a complete surah list: if it's a page session with a parseable pages string, tapping should set the text controller to `nextPageRange` of the parsed range; if it's a surah session with a valid surah ID, tapping should set the text controller to the next surah's `nameSimple`.
+
+**Validates: Requirements 6.1, 7.1**
+
+### Property 9: Revisit choice pre-fills correct content
+
+*For any* `RecentSession` with feeling `revisit`, a complete surah list, and a user choice of either `'revisit'` or `'moveOn'`: if the choice is `'revisit'`, the text controller should be set to the current content (same page range or same surah name); if the choice is `'moveOn'`, the text controller should be set to the next content (next page range or next surah name).
+
+**Validates: Requirements 8.3, 8.4, 9.3, 9.4**
+
+## Error Handling
+
+| Scenario | Layer | Behavior |
+|---|---|---|
+| JSON has neither `pages` nor `surah` | `RecentSession.fromJson` | Throws `FormatException('Either pages or surah must be present')` |
+| `pages` string is unparseable | `parsePageRange` | Returns `null` |
+| Unparseable pages on tap (non-revisit) | `_handlePageSessionTap` | No action — text field unchanged |
+| Unparseable pages on tap (revisit) | `_handlePageSessionTap` | No action — bottom sheet not shown |
+| Surah ID not found in `_surahs` | `_surahName` | Returns `null` |
+| Surah not found on tap (non-revisit) | `_handleSurahSessionTap` | No action — text field unchanged |
+| Surah not found on tap (revisit) | `_handleSurahSessionTap` | No action — bottom sheet not shown |
+| Surah not found for display title | `_sessionTitle` | Falls back to `"Surah {id}"` |
+| Bottom sheet dismissed without choice | Tap handler | Text field unchanged (choice is `null`) |
+| Re-fetch fails on navigation return | `_loadRecentSessions` | Sets `_recentError`, displays error message |
+| `_surahs` not yet loaded when row tapped | Tap handler | `_surahName` returns `null`, no action taken |
+
+## Testing Strategy
+
+### Property-Based Tests
+
+Use the `glados` package (already in dev_dependencies) for property tests. Each property test runs a minimum of 100 iterations with randomly generated inputs.
+
+Each test must be tagged with a comment referencing the design property:
+
+```dart
+// Feature: session-quick-resume, Property 1: RecentSession JSON round-trip
+```
+
+| Property | Test Description | Generator Strategy |
+|---|---|---|
+| Property 1 | Generate random `RecentSession` instances (some with pages, some with surah). Serialize via `toJson`, deserialize via `fromJson`, assert all fields match. | Random non-empty strings for sessionId/pages, random ints 1–114 for surah, random choice from valid feelings, random DateTime values. Randomly choose pages-only or surah-only. |
+| Property 2 | Generate random JSON maps with valid sessionId, feeling, createdAt but no pages and no surah. Assert `fromJson` throws `FormatException`. | Random valid strings for sessionId/feeling, random ISO 8601 dates for createdAt. |
+| Property 3 | Generate random (start, end) pairs where 1 <= start <= end <= 604. Format as "Pages {start}–{end}" or "{start}-{end}" randomly. Parse with `parsePageRange`. Assert start, end, span match. | Random positive integer pairs with start <= end. |
+| Property 4 | Generate random alphabetic strings, empty strings, and malformed patterns. Assert `parsePageRange` returns null. | Random strings that don't match page patterns. |
+| Property 5 | Generate random (start, end) pairs. Compute span. Call `nextPageRange`. Parse the result. Assert the parsed start == end + 1 and parsed end == end + span. | Random positive integer pairs with start <= end. |
+| Property 6 | Generate random surah IDs 1–114. Compute next surah. Assert next == id + 1 for id < 114, next == 1 for id == 114. Assert result is in 1–114. | Random integers 1–114. |
+| Property 7 | Generate random sessions and a surah list. Compute title. Assert it matches pages or nameSimple as appropriate. | Random sessions with either pages or surah, random surah list. |
+| Property 8 | Generate random non-revisit sessions with parseable pages or valid surah IDs. Simulate tap. Assert text controller value matches expected next content. | Random sessions with feeling in {smooth, struggled}, random page ranges or surah IDs. |
+| Property 9 | Generate random revisit sessions. For each, simulate both 'revisit' and 'moveOn' choices. Assert text controller matches same or next content respectively. | Random revisit sessions, both page and surah types. |
+
+### Unit Tests (Examples and Edge Cases)
+
+- **Single page parsing**: `parsePageRange("Pages 50")` returns `(start: 50, end: 50, span: 1)` (edge case for Req 3.3)
+- **Next range for single page**: `nextPageRange(50, 50, 1)` returns `"51"` (edge case for Req 4.3)
+- **Next range example**: `nextPageRange(50, 54, 5)` returns `"55-59"` (example for Req 4.2)
+- **Surah 114 wraps to 1**: `nextSurahId(114)` returns `1` (edge case for Req 5.2)
+- **Fallback title for unknown surah**: Session with surah 999 and empty surah list produces title `"Surah 999"` (edge case for Req 2.3)
+- **Unparseable pages — no action on tap**: Tapping a page session with pages `"invalid"` leaves text field unchanged (edge case for Req 6.3)
+- **Unparseable pages — no bottom sheet**: Tapping a revisit page session with pages `"invalid"` does not show bottom sheet (edge case for Req 8.6)
+- **Missing surah — no action on tap**: Tapping a surah session with ID not in list leaves text field unchanged (edge case for Req 7.3)
+- **Missing surah — no bottom sheet**: Tapping a revisit surah session with ID not in list does not show bottom sheet (edge case for Req 9.6)
+- **Bottom sheet dismissed**: Dismissing the bottom sheet (returning null) leaves text field unchanged (edge case for Req 8.5, 9.5)
+- **Re-fetch on return**: After navigating to `/prep` and back, `fetchRecentSessions` is called again (example for Req 10.1)
+- **Loading indicator during re-fetch**: While re-fetch is pending, a loading indicator is visible (example for Req 10.2)
+- **Error on re-fetch failure**: When re-fetch throws, error message is displayed (example for Req 10.3)
+- **Rows are tappable**: Each recent session row is wrapped in a tappable widget (example for Req 11.1)
+- **Bottom sheet shows two page options**: For a revisit page session, bottom sheet shows "Revisit same pages" and "Move on" (example for Req 8.2)
+- **Bottom sheet shows two surah options**: For a revisit surah session, bottom sheet shows "Revisit same surah" and "Move on" (example for Req 9.2)
+
+### Test Configuration
+
+- Property-based testing library: `glados` (already in dev_dependencies)
+- Minimum iterations per property: 100
+- Test runner: `flutter test`
+- Each property test file tagged with feature and property reference
+- Mock HTTP client used for service-level tests
+- Each correctness property is implemented by a single property-based test
