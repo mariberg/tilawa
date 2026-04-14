@@ -1,5 +1,6 @@
 // Post-recitation feedback screen — user rates how the session felt.
 import 'package:flutter/material.dart';
+import '../services/session_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
@@ -14,6 +15,24 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   int _selected = -1;
   bool _showComplete = false;
   double _completeOpacity = 0.0;
+  String? _sessionId;
+  SessionService? _sessionService;
+  bool _didExtractArgs = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didExtractArgs) return;
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args != null) {
+      _didExtractArgs = true;
+      _sessionId = args['sessionId'] as String?;
+      _sessionService = args['sessionService'] as SessionService?;
+    }
+  }
+
+  static const feelingMap = {0: 'smooth', 1: 'struggled', 2: 'revisit'};
 
   static const _options = [
     {'label': 'Smooth', 'icon': '✓'},
@@ -22,6 +41,16 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   ];
 
   void _submit() {
+    if (_sessionId != null && _sessionService != null) {
+      _sessionService!
+          .submitFeeling(
+            sessionId: _sessionId!,
+            feeling: feelingMap[_selected]!,
+          )
+          .catchError((e) {
+        debugPrint('submitFeeling error: $e');
+      });
+    }
     setState(() => _showComplete = true);
     // Fade in
     Future.delayed(const Duration(milliseconds: 50), () {

@@ -1,5 +1,11 @@
 // Prep screen — keyword flashcards with flip interaction and dot navigation.
 import 'package:flutter/material.dart';
+import '../models/keyword_model.dart';
+import '../models/session_result_payload.dart';
+import '../services/keyword_display_manager.dart';
+import '../services/selection_tracker.dart';
+import '../services/session_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/keyword_card.dart';
@@ -18,19 +24,43 @@ class _PrepScreenState extends State<PrepScreen> {
   late List<int> cardStates;
 
   String _overview = '';
-  List<Map<String, dynamic>> keywords = [];
+  String? _pages;
+  int? _surah;
+  // ignore: unused_field
+  late String _sessionId;
+  late KeywordDisplayManager _manager;
+  late SelectionTracker _tracker;
+  late SessionService _sessionService;
+  bool _initialized = false;
+  late Stopwatch _stopwatch;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_initialized) return;
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    if (args != null && keywords.isEmpty) {
+    if (args != null) {
+      _initialized = true;
       final overviewList = args['overview'] as List<String>? ?? [];
       _overview = overviewList.join(' ');
-      keywords =
+
+      _pages = args['pages'] as String?;
+      _surah = args['surah'] as int?;
+      _sessionId = args['sessionId'] as String? ?? '';
+
+      final authService = args['authService'] as AuthService;
+      _sessionService = SessionService(authService: authService);
+      _tracker = SelectionTracker();
+      _stopwatch = Stopwatch()..start();
+
+      final rawKeywords =
           (args['keywords'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      cardStates = List.filled(keywords.length, 0);
+      final keywordModels =
+          rawKeywords.map((k) => KeywordModel.fromJson(k)).toList();
+      _manager = KeywordDisplayManager(keywordModels);
+
+      cardStates = List.filled(_manager.totalVisible, 0);
     }
   }
 
@@ -38,29 +68,74 @@ class _PrepScreenState extends State<PrepScreen> {
     if (!isFlipped) {
       setState(() => isFlipped = true);
     }
-    // When flipped, tapping the card does nothing — user must pick an action button.
   }
 
-  void _setCardState(int value) {
+  void _handleKnown() {
+    final currentKeyword = _manager.visibleKeywords[currentIndex];
+    _tracker.record(currentKeyword.arabic, currentKeyword.translation, 'known');
+
+    final isLastCard = currentIndex == _manager.totalVisible - 1;
+    _manager.replaceKnown(currentIndex);
+
+    // If visible list shrank and we're past the end, treat as last card
+    if (currentIndex >= _manager.totalVisible) {
+      _completeSession();
+      return;
+    }
+
+    if (isLastCard && _manager.totalVisible == currentIndex) {
+      _completeSession();
+      return;
+    }
+
     setState(() {
-      cardStates[currentIndex] = value;
+      cardStates = List.filled(_manager.totalVisible, 0);
+      isFlipped = false;
     });
-    final isLastCard = currentIndex == keywords.length - 1;
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (!mounted) return;
-      if (isLastCard) {
-        Navigator.pushReplacementNamed(context, '/recitation');
-      } else {
-        setState(() {
-          currentIndex = currentIndex + 1;
-          isFlipped = false;
-        });
-      }
+  }
+
+  void _handleNotSureOrReview(String status) {
+    final currentKeyword = _manager.visibleKeywords[currentIndex];
+    _tracker.record(currentKeyword.arabic, currentKeyword.translation, status);
+
+    final isLastCard = currentIndex == _manager.totalVisible - 1;
+    if (isLastCard) {
+      _completeSession();
+      return;
+    }
+
+    setState(() {
+      currentIndex = currentIndex + 1;
+      isFlipped = false;
+    });
+  }
+
+  void _setCardState(int stateValue) {
+    if (stateValue == 1) {
+      _handleKnown();
+    } else if (stateValue == 2) {
+      _handleNotSureOrReview('not_sure');
+    } else if (stateValue == 3) {
+      _handleNotSureOrReview('review');
+    }
+  }
+
+  Future<void> _completeSession() async {
+    _stopwatch.stop();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, '/recitation', arguments: {
+      'pages': _pages,
+      'surah': _surah,
+      'durationSecs': _stopwatch.elapsed.inSeconds,
+      'keywords': _tracker.getRecords(),
+      'authService': _sessionService,
+      'sessionId': _sessionId,
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasKeywords = _initialized && _manager.totalVisible > 0;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -69,7 +144,6 @@ class _PrepScreenState extends State<PrepScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Nav row
               Row(
                 children: [
                   GestureDetector(
@@ -95,7 +169,6 @@ class _PrepScreenState extends State<PrepScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              // Overview
               Text(
                 _overview.isNotEmpty
                     ? _overview
@@ -103,30 +176,27 @@ class _PrepScreenState extends State<PrepScreen> {
                 style: AppTextStyles.displayBody,
               ),
               const SizedBox(height: 20),
-              // Keywords header
-              if (keywords.isNotEmpty) ...[
+              if (hasKeywords) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('KEYWORDS', style: AppTextStyles.label),
                     Text(
-                      '${currentIndex + 1} of ${keywords.length}',
+                      '${currentIndex + 1} of ${_manager.totalVisible}',
                       style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
-                // Keyword card
                 Expanded(
                   child: KeywordCard(
                     key: ValueKey('$currentIndex-$isFlipped'),
-                    keyword: keywords[currentIndex],
+                    keyword: _manager.visibleKeywords[currentIndex].toJson(),
                     isFlipped: isFlipped,
                     onTap: _onCardTap,
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Action buttons (shown when flipped)
                 if (isFlipped)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -140,8 +210,7 @@ class _PrepScreenState extends State<PrepScreen> {
                       ],
                     ),
                   ),
-                // Dot indicator
-                DotIndicator(count: keywords.length, activeIndex: currentIndex),
+                DotIndicator(count: _manager.totalVisible, activeIndex: currentIndex),
               ] else ...[
                 const Expanded(
                   child: Center(

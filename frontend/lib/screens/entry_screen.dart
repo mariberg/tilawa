@@ -29,14 +29,15 @@ class EntryScreen extends StatefulWidget {
 }
 
 class _EntryScreenState extends State<EntryScreen> {
-  late AuthService _authService;
-  late SessionService _sessionService;
+  AuthService? _authService;
+  SessionService? _sessionService;
   bool _didExtractArgs = false;
 
   final SurahService _surahService = SurahService();
   final TextEditingController _textController = TextEditingController();
 
   List<Surah>? _surahs;
+  Surah? _selectedSurah;
   String? _error;
   bool _isLoading = true;
   bool _isPreparing = false;
@@ -52,8 +53,18 @@ class _EntryScreenState extends State<EntryScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_didExtractArgs) {
-      _authService = ModalRoute.of(context)!.settings.arguments as AuthService;
-      _sessionService = SessionService(authService: _authService);
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args == null || args is! AuthService) {
+        // After a full refresh, arguments are lost — redirect to login.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/');
+          }
+        });
+        return;
+      }
+      _authService = args;
+      _sessionService = SessionService(authService: _authService!);
       _didExtractArgs = true;
     }
   }
@@ -117,7 +128,7 @@ class _EntryScreenState extends State<EntryScreen> {
       final pages = _parsePages(input);
       final surah = pages == null ? input : null;
 
-      final response = await _sessionService.prepare(
+      final response = await _sessionService!.prepare(
         pages: pages,
         surah: surah,
         familiarity: _familiarity,
@@ -128,6 +139,9 @@ class _EntryScreenState extends State<EntryScreen> {
         'sessionId': response.sessionId,
         'overview': response.overview,
         'keywords': response.keywords.map((k) => k.toJson()).toList(),
+        'pages': pages,
+        'surah': _selectedSurah?.id,
+        'authService': _authService!,
       });
     } on FormatException catch (e) {
       if (!mounted) return;
@@ -218,6 +232,7 @@ class _EntryScreenState extends State<EntryScreen> {
                   );
                 },
                 onSelected: (surah) {
+                  _selectedSurah = surah;
                   _textController.text = surah.nameSimple;
                 },
                 emptyBuilder: (context) {

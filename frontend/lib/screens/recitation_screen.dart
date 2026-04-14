@@ -1,6 +1,9 @@
 // Recitation session screen — waveform visualization and tap-to-finish.
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../models/keyword_selection_record.dart';
+import '../models/session_result_payload.dart';
+import '../services/session_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
@@ -14,6 +17,15 @@ class RecitationScreen extends StatefulWidget {
 class _RecitationScreenState extends State<RecitationScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  bool _isSubmitting = false;
+
+  String? _pages;
+  int? _surah;
+  int _durationSecs = 0;
+  List<KeywordSelectionRecord> _keywords = [];
+  SessionService? _sessionService;
+  String? _sessionId;
+  bool _didExtractArgs = false;
 
   @override
   void initState() {
@@ -25,13 +37,56 @@ class _RecitationScreenState extends State<RecitationScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didExtractArgs) return;
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args != null) {
+      _didExtractArgs = true;
+      _pages = args['pages'] as String?;
+      _surah = args['surah'] as int?;
+      _durationSecs = args['durationSecs'] as int? ?? 0;
+      _keywords =
+          args['keywords'] as List<KeywordSelectionRecord>? ?? [];
+      _sessionService = args['authService'] as SessionService?;
+      _sessionId = args['sessionId'] as String?;
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
-  void _onDone() {
-    Navigator.pushReplacementNamed(context, '/feedback');
+  Future<void> _onDone() async {
+    String? createdSessionId;
+    if (_sessionService != null && !_isSubmitting) {
+      setState(() => _isSubmitting = true);
+      try {
+        createdSessionId = await _sessionService!.submitResults(
+          payload: SessionResultPayload(
+            pages: _pages,
+            surah: _surah,
+            durationSecs: _durationSecs,
+            keywords: _keywords,
+          ),
+        );
+        debugPrint('[RecitationScreen] submitResults returned sessionId: $createdSessionId');
+      } catch (e) {
+        debugPrint('[RecitationScreen] submitResults error: $e');
+      }
+    }
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(
+      context,
+      '/feedback',
+      arguments: {
+        'sessionId': createdSessionId ?? _sessionId,
+        'sessionService': _sessionService,
+      },
+    );
   }
 
   @override
@@ -103,7 +158,7 @@ class _RecitationScreenState extends State<RecitationScreen>
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: _onDone,
+                  onPressed: _isSubmitting ? null : _onDone,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.primaryLight,
@@ -113,7 +168,16 @@ class _RecitationScreenState extends State<RecitationScreen>
                     textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
                     elevation: 0,
                   ),
-                  child: const Text('Done'),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primaryLight,
+                          ),
+                        )
+                      : const Text('Done'),
                 ),
               ),
               const Spacer(),
