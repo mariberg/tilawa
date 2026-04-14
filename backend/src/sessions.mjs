@@ -203,15 +203,36 @@ Return ONLY valid JSON with this exact shape, no extra text:
 
 /**
  * POST /sessions
- * Creates a completed session record.
+ * Creates a completed session record and upserts known keywords for the user.
+ *
+ * @param {object} body - Request body
+ * @param {string} body.pages - Page range (e.g. "50-54")
+ * @param {string|number} body.surah - Surah number
+ * @param {number} body.durationSecs - Session duration in seconds
+ * @param {Array<{arabic: string, translation: string, status: string}>} [body.keywords] - Keyword familiarity selections
+ * @param {string} userId - Authenticated user ID
  */
 export async function createSession(body, userId) {
-  const { pages, surah, durationSecs } = body;
+  const { pages, surah, durationSecs, keywords } = body;
 
-  if (!pages || !surah || durationSecs == null) {
+  if (!pages && !surah) {
     return {
       statusCode: 400,
-      body: { error: "Bad Request", message: "pages, surah, and durationSecs are required" },
+      body: { error: "Bad Request", message: "Either pages or surah is required" },
+    };
+  }
+
+  if (durationSecs == null) {
+    return {
+      statusCode: 400,
+      body: { error: "Bad Request", message: "durationSecs is required" },
+    };
+  }
+
+  if (!Array.isArray(keywords)) {
+    return {
+      statusCode: 400,
+      body: { error: "Bad Request", message: "keywords array is required" },
     };
   }
 
@@ -225,8 +246,26 @@ export async function createSession(body, userId) {
     pages,
     surah,
     durationSecs,
+    keywords: keywords || [],
     createdAt,
   });
+
+  // Upsert a KEYWORD# item for each keyword marked "known"
+  if (Array.isArray(keywords)) {
+    const knownKeywords = keywords.filter((k) => k.status === "known" && k.arabic);
+    await Promise.all(
+      knownKeywords.map((k) =>
+        putItem({
+          PK: `USER#${userId}`,
+          SK: `KEYWORD#${k.arabic}`,
+          arabic: k.arabic,
+          translation: k.translation || "",
+          lastSeenAt: createdAt,
+          sessionId,
+        })
+      )
+    );
+  }
 
   return {
     statusCode: 201,

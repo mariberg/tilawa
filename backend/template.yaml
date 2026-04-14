@@ -216,6 +216,27 @@ Resources:
       KeyType: API_KEY
       UsagePlanId: !Ref UsagePlan
 
+  # ---- Gateway Responses (CORS on 4XX/5XX) ----
+  GatewayResponseDefault4XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref RestApi
+      ResponseType: DEFAULT_4XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type, Authorization, x-api-key'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET, POST, PUT, PATCH, DELETE, OPTIONS'"
+
+  GatewayResponseDefault5XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref RestApi
+      ResponseType: DEFAULT_5XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type, Authorization, x-api-key'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET, POST, PUT, PATCH, DELETE, OPTIONS'"
+
   # ---- Lambda Permission ----
   LambdaPermission:
     Type: AWS::Lambda::Permission
