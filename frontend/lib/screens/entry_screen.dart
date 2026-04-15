@@ -1,7 +1,7 @@
 // Home screen — text input, familiarity selection, recent sessions, and prepare button.
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'dart:js' as js;
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../models/surah.dart';
@@ -314,12 +314,11 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
                   IconButton(
                     icon: const Icon(Icons.logout, color: AppColors.textSecondary),
                     tooltip: 'Logout',
-                    onPressed: () async {
+                    onPressed: () {
                       final logoutUrl = _authService!.logout('http://localhost:5000/logout');
-                      await launchUrl(Uri.parse(logoutUrl), mode: LaunchMode.externalApplication);
-                      if (mounted) {
-                        Navigator.pushReplacementNamed(context, '/');
-                      }
+                      // Redirect the current window to the OAuth2 logout URL.
+                      // The provider will end the session and redirect back to the app.
+                      js.context.callMethod('eval', ['window.location.replace("$logoutUrl")']);
                     },
                   ),
                 ],
