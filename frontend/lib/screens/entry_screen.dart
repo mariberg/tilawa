@@ -15,16 +15,84 @@ import '../widgets/familiarity_pills.dart';
 import '../widgets/revisit_bottom_sheet.dart';
 import '../main.dart' show routeObserver;
 
-/// Filters [surahs] by case-insensitive substring match on [nameSimple].
+import 'dart:math' show min;
+
+/// Normalizes an Arabic transliteration string for fuzzy comparison.
+/// Strips the common article prefix (al-/an-/ar-/as-/at-/ad-/ash-/ath-/adh-),
+/// removes hyphens, apostrophes, and extra whitespace, then lowercases.
+String _normalize(String s) {
+  var t = s.toLowerCase().trim();
+  // Strip leading article prefix: "al-", "an-", "ar-", "as-", "at-", "ad-",
+  // "ash-", "ath-", "adh-", with or without the hyphen/space.
+  t = t.replaceFirst(RegExp(r'^(al|an|ar|as|at|ad|ash|ath|adh)[\s\-]?'), '');
+  // Remove remaining hyphens, apostrophes, and collapse whitespace.
+  t = t.replaceAll(RegExp(r"[\-'`]"), '').replaceAll(RegExp(r'\s+'), '');
+  return t;
+}
+
+/// Computes the Levenshtein edit distance between two strings.
+int _editDistance(String a, String b) {
+  if (a == b) return 0;
+  if (a.isEmpty) return b.length;
+  if (b.isEmpty) return a.length;
+
+  final m = a.length, n = b.length;
+  var prev = List<int>.generate(n + 1, (j) => j);
+  var curr = List<int>.filled(n + 1, 0);
+
+  for (var i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (var j = 1; j <= n; j++) {
+      final cost = a[i - 1] == b[j - 1] ? 0 : 1;
+      curr[j] = min(min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+    }
+    final tmp = prev;
+    prev = curr;
+    curr = tmp;
+  }
+  return prev[n];
+}
+
+/// Filters [surahs] by case-insensitive substring match on [nameSimple],
+/// falling back to fuzzy matching (normalized prefix stripping + edit distance)
+/// when no exact substring matches are found.
 /// Returns an empty list when [query] is empty or starts with a digit
 /// (indicating a page-range input like "50–54").
 List<Surah> filterSurahs(List<Surah> surahs, String query) {
   final trimmed = query.trimLeft();
   if (trimmed.isEmpty || RegExp(r'^\d').hasMatch(trimmed)) return [];
   final lowerQuery = trimmed.toLowerCase();
-  return surahs
+
+  // 1. Try exact substring match first (existing behavior).
+  final exact = surahs
       .where((s) => s.nameSimple.toLowerCase().contains(lowerQuery))
       .toList();
+  if (exact.isNotEmpty) return exact;
+
+  // 2. Fuzzy fallback: normalize both sides and rank by edit distance.
+  final normQuery = _normalize(trimmed);
+  if (normQuery.isEmpty) return [];
+
+  final scored = <(Surah, int)>[];
+  for (final s in surahs) {
+    final normName = _normalize(s.nameSimple);
+    // Check normalized substring first.
+    if (normName.contains(normQuery) || normQuery.contains(normName)) {
+      scored.add((s, 0));
+      continue;
+    }
+    final dist = _editDistance(normQuery, normName);
+    // Allow up to ~40% of the longer string's length as tolerance.
+    final maxLen = normQuery.length > normName.length
+        ? normQuery.length
+        : normName.length;
+    if (dist <= (maxLen * 0.4).ceil()) {
+      scored.add((s, dist));
+    }
+  }
+
+  scored.sort((a, b) => a.$2.compareTo(b.$2));
+  return scored.map((e) => e.$1).toList();
 }
 
 class EntryScreen extends StatefulWidget {
@@ -268,6 +336,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
           setState(() => _error = 'Surah not found. Please select from the list.');
           return;
         }
+        _selectedSurah ??= match;
         surahNumber = match.id.toString();
       }
 
@@ -284,6 +353,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
         'keywords': response.keywords.map((k) => k.toJson()).toList(),
         'pages': pages,
         'surah': _selectedSurah?.id,
+        'surahName': _selectedSurah?.nameSimple,
         'authService': _authService!,
       });
     } on FormatException catch (e) {
@@ -301,7 +371,9 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
@@ -315,7 +387,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
                     icon: const Icon(Icons.logout, color: AppColors.textSecondary),
                     tooltip: 'Logout',
                     onPressed: () {
-                      final logoutUrl = _authService!.logout('http://localhost:5000/logout');
+                      final logoutUrl = _authService!.logout('http://localhost:5000');
                       // Redirect the current window to the OAuth2 logout URL.
                       // The provider will end the session and redirect back to the app.
                       js.context.callMethod('eval', ['window.location.replace("$logoutUrl")']);
@@ -492,7 +564,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
                   ),
                 )
               else
-                ..._recentSessions!.asMap().entries.expand((entry) {
+                ..._recentSessions!.take(5).toList().asMap().entries.expand((entry) {
                   final session = entry.value;
                   final isLast = entry.key == _recentSessions!.length - 1;
                   return [
@@ -524,22 +596,24 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
                     ),
                     elevation: 0,
                   ),
-                  child: _isPreparing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.primaryLight,
-                          ),
-                        )
-                      : const Text('Prepare'),
+                  child: const Text('Prepare'),
                 ),
               ),
               const SizedBox(height: 24),
             ],
           ),
         ),
+      ),
+          if (_isPreparing)
+            Container(
+              color: Colors.black.withValues(alpha: 0.3),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

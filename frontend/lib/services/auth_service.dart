@@ -96,6 +96,7 @@ class AuthService {
         'response_type': 'code',
         'scope': _scopes,
         'state': state,
+        'prompt': 'login',
       },
     );
 

@@ -26,6 +26,7 @@ class _PrepScreenState extends State<PrepScreen> {
   String _overview = '';
   String? _pages;
   int? _surah;
+  String? _surahName;
   // ignore: unused_field
   late String _sessionId;
   late KeywordDisplayManager _manager;
@@ -47,6 +48,7 @@ class _PrepScreenState extends State<PrepScreen> {
 
       _pages = args['pages'] as String?;
       _surah = args['surah'] as int?;
+      _surahName = args['surahName'] as String?;
       _sessionId = args['sessionId'] as String? ?? '';
 
       final authService = args['authService'] as AuthService;
@@ -126,6 +128,7 @@ class _PrepScreenState extends State<PrepScreen> {
     Navigator.pushReplacementNamed(context, '/recitation', arguments: {
       'pages': _pages,
       'surah': _surah,
+      'surahName': _surahName,
       'durationSecs': _stopwatch.elapsed.inSeconds,
       'keywords': _tracker.getRecords(),
       'authService': _sessionService,
@@ -161,7 +164,13 @@ class _PrepScreenState extends State<PrepScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Surah Al-Baqarah · Pages 50–54',
+                      _surahName != null && _pages != null
+                          ? 'Surah $_surahName · Pages $_pages'
+                          : _surahName != null
+                              ? 'Surah $_surahName'
+                              : _pages != null
+                                  ? 'Pages $_pages'
+                                  : 'Session',
                       style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                       overflow: TextOverflow.ellipsis,
                     ),

@@ -126,18 +126,19 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 64),
+              const Spacer(),
               Text(
                 'Welcome back',
-                style: AppTextStyles.h1,
+                style: AppTextStyles.h1.copyWith(fontSize: 32),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'Sign in to continue your preparation',
-                style: AppTextStyles.displayBody,
+                style: AppTextStyles.displayBody.copyWith(fontSize: 18),
                 textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 32),
               // --- Mock auth form elements below are commented out (replaced by OAuth2 login flow) ---
               // const SizedBox(height: 40),
               // // Username
@@ -237,7 +238,6 @@ class _AuthScreenState extends State<AuthScreen> {
               // ),
               // const SizedBox(height: 24),
               // --- End of commented-out mock auth form elements ---
-              const Spacer(),
               // OAuth2 login button
               SizedBox(
                 width: double.infinity,
@@ -265,7 +265,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             color: AppColors.primaryLight,
                           ),
                         )
-                      : const Text('Continue with Quran.com'),
+                      : const Text('Continue with Quran Foundation'),
                 ),
               ),
               if (_errorMessage != null) ...[
@@ -277,6 +277,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ],
               const SizedBox(height: 24),
+              const Spacer(),
             ],
           ),
         ),

@@ -21,6 +21,7 @@ class _RecitationScreenState extends State<RecitationScreen>
 
   String? _pages;
   int? _surah;
+  String? _surahName;
   int _durationSecs = 0;
   List<KeywordSelectionRecord> _keywords = [];
   SessionService? _sessionService;
@@ -46,6 +47,7 @@ class _RecitationScreenState extends State<RecitationScreen>
       _didExtractArgs = true;
       _pages = args['pages'] as String?;
       _surah = args['surah'] as int?;
+      _surahName = args['surahName'] as String?;
       _durationSecs = args['durationSecs'] as int? ?? 0;
       _keywords =
           args['keywords'] as List<KeywordSelectionRecord>? ?? [];
@@ -116,7 +118,13 @@ class _RecitationScreenState extends State<RecitationScreen>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Surah Al-Baqarah · Pages 50–54',
+                      _surahName != null && _pages != null
+                          ? 'Surah $_surahName · Pages $_pages'
+                          : _surahName != null
+                              ? 'Surah $_surahName'
+                              : _pages != null
+                                  ? 'Pages $_pages'
+                                  : 'Session',
                       style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                       overflow: TextOverflow.ellipsis,
                     ),
