@@ -1,6 +1,7 @@
 // Home screen — text input, familiarity selection, recent sessions, and prepare button.
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../models/surah.dart';
@@ -255,11 +256,24 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
 
     try {
       final pages = _parsePages(input);
-      final surah = pages == null ? input : null;
+      // For surah input, send the chapter number (1-114) not the name.
+      String? surahNumber;
+      if (pages == null) {
+        final match = _selectedSurah ??
+            _surahs?.cast<Surah?>().firstWhere(
+                  (s) => s!.nameSimple.toLowerCase() == input.toLowerCase(),
+                  orElse: () => null,
+                );
+        if (match == null) {
+          setState(() => _error = 'Surah not found. Please select from the list.');
+          return;
+        }
+        surahNumber = match.id.toString();
+      }
 
       final response = await _sessionService!.prepare(
         pages: pages,
-        surah: surah,
+        surah: surahNumber,
         familiarity: _familiarity,
       );
 
@@ -293,7 +307,24 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.logout, color: AppColors.textSecondary),
+                    tooltip: 'Logout',
+                    onPressed: () async {
+                      final logoutUrl = _authService!.logout('http://localhost:5000/logout');
+                      await launchUrl(Uri.parse(logoutUrl), mode: LaunchMode.externalApplication);
+                      if (mounted) {
+                        Navigator.pushReplacementNamed(context, '/');
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               Text(
                 'What are you about to recite?',
                 style: AppTextStyles.h1,

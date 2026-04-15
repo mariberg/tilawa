@@ -12,13 +12,31 @@ import 'screens/feedback_screen.dart';
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
 
+/// Checks if the current browser URL is an OAuth2 callback and extracts
+/// the `code` and `state` query parameters if present.
+({String code, String state})? _extractOAuthCallback() {
+  final uri = Uri.base;
+  if (uri.path == '/auth/callback' &&
+      uri.queryParameters.containsKey('code') &&
+      uri.queryParameters.containsKey('state')) {
+    return (
+      code: uri.queryParameters['code']!,
+      state: uri.queryParameters['state']!,
+    );
+  }
+  return null;
+}
+
 Future<void> main() async {
   await dotenv.load();
-  runApp(const QuranPrepApp());
+  final oauthCallback = _extractOAuthCallback();
+  runApp(QuranPrepApp(oauthCallback: oauthCallback));
 }
 
 class QuranPrepApp extends StatelessWidget {
-  const QuranPrepApp({super.key});
+  final ({String code, String state})? oauthCallback;
+
+  const QuranPrepApp({super.key, this.oauthCallback});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +50,7 @@ class QuranPrepApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (_) => const AuthScreen(),
+        '/': (_) => AuthScreen(oauthCallback: oauthCallback),
         '/home': (_) => const EntryScreen(),
         '/prep': (_) => const PrepScreen(),
         '/recitation': (_) => const RecitationScreen(),

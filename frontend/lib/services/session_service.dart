@@ -48,9 +48,12 @@ class SessionService {
 
     final url = '$baseUrl/sessions/prepare';
     final encodedBody = jsonEncode(body);
+    // Replaced by OAuth2 token headers from getAuthHeaders()
+    // 'Authorization': _authService.getAuthHeader(),
+    final authHeaders = await _authService.getAuthHeaders();
     final headers = {
       'Content-Type': 'application/json',
-      'Authorization': _authService.getAuthHeader(),
+      ...authHeaders,
       'x-api-key': apiKey,
     };
 
@@ -104,9 +107,12 @@ class SessionService {
 
     final url = '$baseUrl/sessions';
     final encodedBody = jsonEncode(payload.toJson());
+    // Replaced by OAuth2 token headers from getAuthHeaders()
+    // 'Authorization': _authService.getAuthHeader(),
+    final authHeaders = await _authService.getAuthHeaders();
     final headers = {
       'Content-Type': 'application/json',
-      'Authorization': _authService.getAuthHeader(),
+      ...authHeaders,
       'x-api-key': apiKey,
     };
 
@@ -162,9 +168,12 @@ class SessionService {
 
     final url = '$baseUrl/sessions/$sessionId/feeling';
     final encodedBody = jsonEncode({'feeling': feeling});
+    // Replaced by OAuth2 token headers from getAuthHeaders()
+    // 'Authorization': _authService.getAuthHeader(),
+    final authHeaders = await _authService.getAuthHeaders();
     final headers = {
       'Content-Type': 'application/json',
-      'Authorization': _authService.getAuthHeader(),
+      ...authHeaders,
       'x-api-key': apiKey,
     };
 
@@ -209,8 +218,11 @@ class SessionService {
     }
 
     final url = '$baseUrl/sessions/recent';
+    // Replaced by OAuth2 token headers from getAuthHeaders()
+    // 'Authorization': _authService.getAuthHeader(),
+    final authHeaders = await _authService.getAuthHeaders();
     final headers = {
-      'Authorization': _authService.getAuthHeader(),
+      ...authHeaders,
       'x-api-key': apiKey,
     };
 
