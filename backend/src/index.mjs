@@ -35,13 +35,9 @@ export async function handler(event, context) {
       };
     }
 
-    const userId = extractUserId(event);
+    const { userId, accessToken } = extractUserId(event);
 
-    // Extract user access token from Authorization header for downstream use
-    const authHeader = event.headers?.Authorization || event.headers?.authorization;
-    const userAccessToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-
-    const result = await routeRequest(event, userId, userAccessToken);
+    const result = await routeRequest(event, userId, accessToken);
 
     return {
       statusCode: result.statusCode,
@@ -52,7 +48,9 @@ export async function handler(event, context) {
     // Auth errors from extractUserId → 401
     if (
       error.message === "Missing Authorization header" ||
-      error.message === "Invalid Authorization header format"
+      error.message === "Invalid Authorization header format" ||
+      error.message === "Invalid JWT format" ||
+      error.message === "JWT missing sub claim"
     ) {
       return {
         statusCode: 401,
