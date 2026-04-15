@@ -16,6 +16,10 @@ const API_BASE_BY_ENV = {
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
+// Independent prelive token cache for Reading Sessions API
+let cachedPreliveToken = null;
+let preliveTokenExpiresAt = 0;
+
 /**
  * Fetches an OAuth2 access token using client credentials flow.
  * Caches the token in memory until it expires.
@@ -54,6 +58,48 @@ async function getAccessToken() {
   // Refresh 60s before actual expiry to avoid edge cases
   tokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000;
   return cachedToken;
+}
+
+/**
+ * Fetches an OAuth2 access token from the prelive auth server.
+ * Always targets prelive regardless of QF_ENV.
+ * Caches independently from the production token used by the content API.
+ */
+async function getPreliveAccessToken() {
+  if (cachedPreliveToken && Date.now() < preliveTokenExpiresAt) {
+    return cachedPreliveToken;
+  }
+
+  const basicAuth = Buffer.from(
+    `${process.env.QF_PRELIVE_CLIENT_ID}:${process.env.QF_PRELIVE_CLIENT_SECRET}`
+  ).toString("base64");
+
+  const res = await fetch(
+    "https://prelive-oauth2.quran.foundation/oauth2/token",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        scope: "reading_session",
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error("Prelive OAuth token error:", res.status, errBody);
+    throw new Error(`Prelive OAuth token request failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  cachedPreliveToken = data.access_token;
+  // Refresh 60s before actual expiry to avoid edge cases
+  preliveTokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000;
+  return cachedPreliveToken;
 }
 
 /**
@@ -108,6 +154,84 @@ function parsePageRange(pages) {
   if (parts.length === 1) return [parts[0]];
   const [start, end] = parts;
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+
+/**
+ * Resolves session parameters to chapter and verse numbers for the Reading Sessions API.
+ *
+ * @param {string|number|undefined} surah - Surah number if provided
+ * @param {string|undefined} pages - Page range string if provided (e.g. "50-54")
+ * @returns {Promise<{chapterNumber: number, verseNumber: number}>}
+ */
+async function resolveChapterAndVerse(surah, pages) {
+  console.log("resolveChapterAndVerse called with:", { surah, pages });
+  if (surah != null) {
+    console.log("Using surah path:", { chapterNumber: Number(surah), verseNumber: 1 });
+    return { chapterNumber: Number(surah), verseNumber: 1 };
+  }
+
+  const pageNumbers = parsePageRange(pages);
+  const firstPage = pageNumbers[0];
+  console.log("Using pages path, fetching verses for page:", firstPage);
+  const verses = await fetchVersesForPage(firstPage);
+
+  if (!verses || verses.length === 0) {
+    throw new Error(`No verses returned for page ${firstPage}`);
+  }
+
+  const verseKey = verses[0].verseKey;
+  if (!verseKey || !verseKey.includes(":")) {
+    throw new Error(`Invalid verse_key format: ${verseKey}`);
+  }
+
+  const [chapter, verse] = verseKey.split(":").map(Number);
+  if (Number.isNaN(chapter) || Number.isNaN(verse)) {
+    throw new Error(`Failed to parse verse_key: ${verseKey}`);
+  }
+
+  return { chapterNumber: chapter, verseNumber: verse };
+}
+
+/**
+ * Syncs a completed session to the Quran.com Reading Sessions API.
+ * Fire-and-forget: logs errors but never throws.
+ *
+ * @param {number} chapterNumber - Quran chapter number (>= 1)
+ * @param {number} verseNumber - Verse number within the chapter (>= 1)
+ * @param {string} userAccessToken - The user's OAuth2 access token
+ */
+async function syncReadingSession(chapterNumber, verseNumber, userAccessToken) {
+  if (!userAccessToken) {
+    console.warn("syncReadingSession: missing user access token, skipping sync");
+    return;
+  }
+
+  try {
+    const requestBody = { chapterNumber, verseNumber };
+    console.log("Syncing reading session:", requestBody);
+
+    const res = await fetch(
+      "https://apis-prelive.quran.foundation/auth/v1/reading-sessions",
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": userAccessToken,
+          "x-client-id": process.env.QF_PRELIVE_CLIENT_ID,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("Reading Sessions API error:", res.status, errBody);
+    } else {
+      console.log("Reading session synced:", { chapterNumber, verseNumber });
+    }
+  } catch (err) {
+    console.error("Reading session sync error:", err);
+  }
 }
 
 /**
@@ -232,8 +356,9 @@ Return ONLY valid JSON with this exact shape, no extra text:
  * @param {number} body.durationSecs - Session duration in seconds
  * @param {Array<{arabic: string, translation: string, status: string}>} [body.keywords] - Keyword familiarity selections
  * @param {string} userId - Authenticated user ID
+ * @param {string|null} userAccessToken - Raw Bearer token from the caller (passed to syncReadingSession)
  */
-export async function createSession(body, userId) {
+export async function createSession(body, userId, userAccessToken) {
   const { pages, surah, durationSecs, keywords } = body;
 
   if (!pages && !surah) {
@@ -286,6 +411,14 @@ export async function createSession(body, userId) {
         })
       )
     );
+  }
+
+  // Fire-and-forget sync to Quran.com Reading Sessions API
+  try {
+    const { chapterNumber, verseNumber } = await resolveChapterAndVerse(surah, pages);
+    await syncReadingSession(chapterNumber, verseNumber, userAccessToken);
+  } catch (err) {
+    console.error("Reading session sync failed:", err);
   }
 
   return {

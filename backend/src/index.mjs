@@ -1,5 +1,6 @@
 import { extractUserId } from "./auth.mjs";
 import { routeRequest } from "./router.mjs";
+import { handleTokenProxy } from "./tokenProxy.mjs";
 
 const CORS_HEADERS = {
   "Content-Type": "application/json",
@@ -19,8 +20,28 @@ const CORS_HEADERS = {
  */
 export async function handler(event, context) {
   try {
+    // Handle CORS preflight for any path
+    if ((event.httpMethod || "").toUpperCase() === "OPTIONS") {
+      return { statusCode: 200, headers: CORS_HEADERS, body: "" };
+    }
+
+    // Bypass auth for the OAuth2 token proxy route
+    if (event.path === "/oauth2/token") {
+      const result = await handleTokenProxy(event);
+      return {
+        statusCode: result.statusCode,
+        headers: CORS_HEADERS,
+        body: JSON.stringify(result.body),
+      };
+    }
+
     const userId = extractUserId(event);
-    const result = await routeRequest(event, userId);
+
+    // Extract user access token from Authorization header for downstream use
+    const authHeader = event.headers?.Authorization || event.headers?.authorization;
+    const userAccessToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+    const result = await routeRequest(event, userId, userAccessToken);
 
     return {
       statusCode: result.statusCode,

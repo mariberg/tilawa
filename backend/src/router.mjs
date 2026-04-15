@@ -10,9 +10,10 @@ import {
  *
  * @param {object} event - API Gateway proxy event
  * @param {string} userId - Authenticated user ID
+ * @param {string|null} userAccessToken - Raw Bearer token from the caller (passed to createSession for sync)
  * @returns {Promise<{statusCode: number, body: object|string}>} Route response
  */
-export async function routeRequest(event, userId) {
+export async function routeRequest(event, userId, userAccessToken) {
   try {
     const method = (event.httpMethod || "").toUpperCase();
     const path = event.path || "";
@@ -33,7 +34,7 @@ export async function routeRequest(event, userId) {
 
     // POST /sessions
     if (method === "POST" && path === "/sessions") {
-      return createSession(JSON.parse(event.body || "{}"), userId);
+      return createSession(JSON.parse(event.body || "{}"), userId, userAccessToken);
     }
 
     // PATCH /sessions/:sessionId/feeling

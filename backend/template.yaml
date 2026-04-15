@@ -25,6 +25,14 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Quran Foundation OAuth2 client secret
+  QuranPreliveClientId:
+    Type: String
+    NoEcho: true
+    Description: Quran Foundation prelive OAuth2 client ID
+  QuranPreliveClientSecret:
+    Type: String
+    NoEcho: true
+    Description: Quran Foundation prelive OAuth2 client secret
 
 Resources:
 
@@ -120,6 +128,8 @@ Resources:
           QF_CLIENT_ID: !Ref QuranClientId
           QF_CLIENT_SECRET: !Ref QuranClientSecret
           QF_ENV: production
+          QF_PRELIVE_CLIENT_ID: !Ref QuranPreliveClientId
+          QF_PRELIVE_CLIENT_SECRET: !Ref QuranPreliveClientSecret
           BEDROCK_ROLE_ARN: !Ref BedrockRoleArn
 
   # ---- API Gateway REST API ----
