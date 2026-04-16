@@ -5,6 +5,7 @@ import 'dart:js' as js;
 
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/level_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
@@ -106,7 +107,21 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       await _authService.handleCallback(code, state, _kRedirectUri);
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home', arguments: _authService);
+
+      final levelService = LevelService(authService: _authService);
+      await levelService.fetchLevel();
+      if (!mounted) return;
+
+      final args = {
+        'authService': _authService,
+        'levelService': levelService,
+      };
+
+      if (levelService.currentLevel == null) {
+        Navigator.pushReplacementNamed(context, '/level', arguments: args);
+      } else {
+        Navigator.pushReplacementNamed(context, '/home', arguments: args);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

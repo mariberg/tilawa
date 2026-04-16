@@ -7,6 +7,8 @@ import 'screens/entry_screen.dart';
 import 'screens/prep_screen.dart';
 import 'screens/recitation_screen.dart';
 import 'screens/feedback_screen.dart';
+import 'screens/level_screen.dart';
+import 'screens/settings_screen.dart';
 
 /// Global route observer so screens can react when they become visible again.
 final RouteObserver<ModalRoute<void>> routeObserver =
@@ -41,7 +43,7 @@ class QuranPrepApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Quran Prep',
+      title: 'Tilawa',
       debugShowCheckedModeBanner: false,
       navigatorObservers: [routeObserver],
       theme: ThemeData(
@@ -52,6 +54,8 @@ class QuranPrepApp extends StatelessWidget {
       routes: {
         '/': (_) => AuthScreen(oauthCallback: oauthCallback),
         '/home': (_) => const EntryScreen(),
+        '/level': (_) => const LevelScreen(),
+        '/settings': (_) => const SettingsScreen(),
         '/prep': (_) => const PrepScreen(),
         '/recitation': (_) => const RecitationScreen(),
         '/feedback': (_) => const FeedbackScreen(),

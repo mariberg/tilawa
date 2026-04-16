@@ -8,6 +8,7 @@ import '../models/surah.dart';
 import '../services/surah_service.dart';
 import '../models/recent_session.dart';
 import '../services/auth_service.dart';
+import '../services/level_service.dart';
 import '../services/session_service.dart';
 import '../utils/date_utils.dart';
 import '../utils/page_utils.dart';
@@ -104,6 +105,7 @@ class EntryScreen extends StatefulWidget {
 
 class _EntryScreenState extends State<EntryScreen> with RouteAware {
   AuthService? _authService;
+  LevelService? _levelService;
   SessionService? _sessionService;
   bool _didExtractArgs = false;
 
@@ -137,7 +139,9 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
     }
     if (!_didExtractArgs) {
       final args = ModalRoute.of(context)?.settings.arguments;
-      if (args == null || args is! AuthService) {
+      if (args == null ||
+          args is! Map<String, dynamic> ||
+          args['authService'] is! AuthService) {
         // After a full refresh, arguments are lost — redirect to login.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -146,7 +150,8 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
         });
         return;
       }
-      _authService = args;
+      _authService = args['authService'] as AuthService;
+      _levelService = args['levelService'] as LevelService?;
       _sessionService = SessionService(authService: _authService!);
       _loadRecentSessions();
       _didExtractArgs = true;
@@ -383,6 +388,16 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  IconButton(
+                    icon: const Icon(Icons.settings, color: AppColors.textSecondary),
+                    tooltip: 'Settings',
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/settings', arguments: {
+                        'authService': _authService!,
+                        'levelService': _levelService!,
+                      });
+                    },
+                  ),
                   IconButton(
                     icon: const Icon(Icons.logout, color: AppColors.textSecondary),
                     tooltip: 'Logout',
