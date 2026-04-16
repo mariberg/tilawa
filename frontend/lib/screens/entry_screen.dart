@@ -12,6 +12,7 @@ import '../services/level_service.dart';
 import '../services/session_service.dart';
 import '../utils/date_utils.dart';
 import '../utils/page_utils.dart';
+import '../utils/preparing_message_controller.dart';
 import '../widgets/familiarity_pills.dart';
 import '../widgets/revisit_bottom_sheet.dart';
 import '../main.dart' show routeObserver;
@@ -119,6 +120,12 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
   bool _isPreparing = false;
   String _familiarity = 'New';
 
+  late final PreparingMessageController _messageController = PreparingMessageController(
+    onChanged: () {
+      if (mounted) setState(() {});
+    },
+  );
+
   List<RecentSession>? _recentSessions;
   bool _isLoadingRecent = true;
   String? _recentError;
@@ -194,6 +201,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
   void dispose() {
     routeObserver.unsubscribe(this);
     _textController.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
@@ -326,6 +334,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
       _error = null;
       _isPreparing = true;
     });
+    _messageController.start();
 
     try {
       final pages = _parsePages(input);
@@ -368,6 +377,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
       if (!mounted) return;
       setState(() => _error = e.toString());
     } finally {
+      _messageController.reset();
       if (mounted) setState(() => _isPreparing = false);
     }
   }
@@ -622,9 +632,21 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
           if (_isPreparing)
             Container(
               color: Colors.black.withValues(alpha: 0.3),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: AppColors.primary,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _messageController.currentMessage,
+                      style: AppTextStyles.small.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

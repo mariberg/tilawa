@@ -23,7 +23,7 @@ class _PrepScreenState extends State<PrepScreen> {
   bool isFlipped = false;
   late List<int> cardStates;
 
-  String _overview = '';
+  List<String> _overviewItems = [];
   String? _pages;
   int? _surah;
   String? _surahName;
@@ -44,7 +44,7 @@ class _PrepScreenState extends State<PrepScreen> {
     if (args != null) {
       _initialized = true;
       final overviewList = args['overview'] as List<String>? ?? [];
-      _overview = overviewList.join(' ');
+      _overviewItems = overviewList;
 
       _pages = args['pages'] as String?;
       _surah = args['surah'] as int?;
@@ -185,12 +185,30 @@ class _PrepScreenState extends State<PrepScreen> {
                     maxHeight: MediaQuery.of(context).size.height * 0.25,
                   ),
                   child: SingleChildScrollView(
-                    child: Text(
-                      _overview.isNotEmpty
-                          ? _overview
-                          : 'Preparing your session...',
-                      style: AppTextStyles.displayBody,
-                    ),
+                    child: _overviewItems.isNotEmpty
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _overviewItems
+                                .map((item) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text('•  ',
+                                              style: AppTextStyles.displayBody),
+                                          Expanded(
+                                            child: Text(item,
+                                                style: AppTextStyles
+                                                    .displayBody),
+                                          ),
+                                        ],
+                                      ),
+                                    ))
+                                .toList(),
+                          )
+                        : Text('Preparing your session...',
+                            style: AppTextStyles.displayBody),
                   ),
                 ),
               ),
