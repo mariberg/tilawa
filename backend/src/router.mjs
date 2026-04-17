@@ -4,6 +4,7 @@ import {
   updateSessionFeeling,
   getRecentSessions,
 } from "./sessions.mjs";
+import { saveSettings, getSettings } from "./settings.mjs";
 
 /**
  * Routes incoming API Gateway requests by HTTP method and path.
@@ -20,6 +21,16 @@ export async function routeRequest(event, userId, userAccessToken) {
 
     if (method === "GET" && path === "/health") {
       return { statusCode: 200, body: { message: "OK" } };
+    }
+
+    // PUT /settings
+    if (method === "PUT" && path === "/settings") {
+      return saveSettings(JSON.parse(event.body || "{}"), userId);
+    }
+
+    // GET /settings
+    if (method === "GET" && path === "/settings") {
+      return getSettings(userId);
     }
 
     // POST /sessions/prepare

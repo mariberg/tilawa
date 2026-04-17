@@ -128,6 +128,116 @@ describe('Feature: known-keywords-filter, Property 2: Output cap', () => {
   });
 });
 
+describe('Feature: lemma-based-keyword-filter, Property 1: Lemma-based exclusion', () => {
+  /**
+   * Validates: Requirements 2.1, 2.2
+   *
+   * For any keyword with a truthy `lemma` matching the exclusion/known set,
+   * the keyword is excluded from output.
+   *
+   * Strategy: generate keyword objects with a truthy lemma, then build a known
+   * set that contains that lemma value. filterKnownKeywords must exclude the keyword.
+   */
+  it('keywords with truthy lemma matching known set are always excluded', () => {
+    // Arbitrary: a non-empty Arabic-ish string for the lemma
+    const lemmaArb = fc.string({ minLength: 1 });
+
+    // Arbitrary: a keyword object with a truthy lemma field
+    const keywordWithLemmaArb = fc.record({
+      arabic: fc.string({ minLength: 1 }),
+      lemma: lemmaArb,
+      translation: fc.string(),
+      hint: fc.string(),
+      type: fc.constantFrom('focus', 'advanced'),
+    });
+
+    fc.assert(
+      fc.property(
+        // Generate 1–10 keywords that all have a truthy lemma
+        fc.array(keywordWithLemmaArb, { minLength: 1, maxLength: 10 }),
+        // Generate 0–5 extra "bystander" keywords (no lemma) that should NOT be excluded
+        fc.array(keywordArb, { minLength: 0, maxLength: 5 }),
+        (lemmaKeywords, bystanders) => {
+          // Build a known set from all the lemma values of the lemma keywords
+          const knownSet = new Set(lemmaKeywords.map(k => k.lemma));
+
+          // Combine: lemma keywords first, then bystanders
+          const allKeywords = [...lemmaKeywords, ...bystanders];
+
+          const result = filterKnownKeywords(allKeywords, knownSet);
+
+          // Every keyword whose lemma is in the known set must be excluded
+          for (const kw of lemmaKeywords) {
+            const found = result.some(r => r === kw);
+            expect(found).toBe(false);
+          }
+        }
+      ),
+      { numRuns: 200 }
+    );
+  });
+});
+
+describe('Feature: lemma-based-keyword-filter, Property 2: Preservation — fallback for no-lemma keywords', () => {
+  /**
+   * Validates: Requirements 2.3, 3.1, 3.2, 3.3, 3.4
+   *
+   * For any keyword without a `lemma`, the fixed filter produces the same
+   * result as filtering on `k.arabic`. This ensures backward compatibility:
+   * keywords with falsy lemma (undefined, null, empty string, or missing)
+   * all resolve to the same filtering outcome.
+   */
+  it('no-lemma keywords are filtered identically regardless of falsy lemma variant', () => {
+    // Arbitrary: keyword with NO lemma property at all (baseline "original" behavior)
+    const keywordNoLemmaArb = fc.record({
+      arabic: fc.string({ minLength: 1 }),
+      translation: fc.string(),
+      hint: fc.string(),
+      type: fc.constantFrom('focus', 'advanced'),
+    });
+
+    // Arbitrary: a falsy lemma value (undefined, null, or empty string)
+    const falsyLemmaArb = fc.constantFrom(undefined, null, '');
+
+    fc.assert(
+      fc.property(
+        fc.array(keywordNoLemmaArb, { minLength: 1, maxLength: 15 }),
+        fc.array(fc.string({ minLength: 1 }), { minLength: 0, maxLength: 10 }),
+        falsyLemmaArb,
+        (keywords, knownArray, falsyLemma) => {
+          const knownSet = new Set(knownArray);
+
+          // Baseline: keywords with no lemma property
+          const baselineResult = filterKnownKeywords(keywords, knownSet);
+
+          // Variant: same keywords but with an explicit falsy lemma value
+          const withFalsyLemma = keywords.map(k => ({ ...k, lemma: falsyLemma }));
+          const variantResult = filterKnownKeywords(withFalsyLemma, knownSet);
+
+          // Both must produce the same number of results
+          expect(variantResult).toHaveLength(baselineResult.length);
+
+          // Each result must correspond to the same original keyword (by arabic field and position)
+          for (let i = 0; i < baselineResult.length; i++) {
+            expect(variantResult[i].arabic).toBe(baselineResult[i].arabic);
+            expect(variantResult[i].translation).toBe(baselineResult[i].translation);
+          }
+
+          // Ordering is preserved: result indices are monotonically increasing in the input
+          const inputArabics = keywords.map(k => k.arabic);
+          let lastIdx = -1;
+          for (const r of baselineResult) {
+            const idx = inputArabics.indexOf(r.arabic, lastIdx + 1);
+            expect(idx).toBeGreaterThan(lastIdx);
+            lastIdx = idx;
+          }
+        }
+      ),
+      { numRuns: 200 }
+    );
+  });
+});
+
 describe('Feature: known-keywords-filter, Property 3: Graceful degradation', () => {
   /**
    * Validates: Requirements 1.3

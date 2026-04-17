@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { putItem, queryItems, updateItem } from "./db.mjs";
+import { getItem, putItem, queryItems, updateItem } from "./db.mjs";
 import { invokeAgent } from "./agent.mjs";
+import highFrequencyWords from './high_frequency_words.json' with { type: 'json' };
+import commonWords from './common_Quranic_words.json' with { type: 'json' };
 
 const AUTH_BASE_BY_ENV = {
   prelive: "https://prelive-oauth2.quran.foundation",
@@ -235,15 +237,60 @@ async function syncReadingSession(chapterNumber, verseNumber, userAccessToken) {
 }
 
 /**
+ * Strips Arabic diacritical marks (tashkīl) from a string for comparison.
+ */
+const stripDiacritics = (str) =>
+  str.replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED]/g, '');
+
+/**
+ * Strips the definite article (ال) from the start of an Arabic word.
+ * Handles both regular (القمر) and sun-letter assimilated forms (الشمس).
+ */
+const stripDefiniteArticle = (str) => str.replace(/^ال/, '');
+
+/**
+ * Normalizes an Arabic word for comparison: strips diacritics, then returns
+ * both the with-article and without-article forms so either can match.
+ */
+function normalizeArabic(str) {
+  const bare = stripDiacritics(str);
+  return [bare, stripDefiniteArticle(bare)];
+}
+
+/**
+ * Builds a Set of normalized roots from a word list for fast lookup.
+ * Each word is stored both with and without the definite article.
+ */
+function buildExclusionSet(words) {
+  const set = new Set();
+  for (const w of words) {
+    for (const form of normalizeArabic(w)) {
+      set.add(form);
+    }
+  }
+  return set;
+}
+
+/**
+ * Checks if a keyword's arabic field matches any entry in an exclusion set,
+ * accounting for diacritics and definite article differences.
+ */
+function isExcluded(arabic, exclusionSet) {
+  return normalizeArabic(arabic).some(form => exclusionSet.has(form));
+}
+
+/**
  * Removes keywords whose arabic field matches an entry in the known set.
- * Preserves original ordering.
+ * Preserves original ordering. Comparison is diacritics-insensitive and
+ * matches with or without the definite article (ال).
  *
  * @param {Array<{arabic: string, translation: string, hint: string, type: string}>} keywords - LLM keywords
  * @param {Set<string>} knownArabicSet - Set of known Arabic strings
  * @returns {Array<{arabic: string, translation: string, hint: string, type: string}>} Filtered keywords
  */
 export function filterKnownKeywords(keywords, knownArabicSet) {
-  return keywords.filter(k => !knownArabicSet.has(k.arabic));
+  const normalizedKnown = buildExclusionSet([...knownArabicSet]);
+  return keywords.filter(k => !isExcluded(k.lemma || k.arabic, normalizedKnown));
 }
 
 /**
@@ -260,6 +307,29 @@ export async function prepareSession(body, userId) {
       body: { error: "Bad Request", message: "familiarity is required" },
     };
   }
+
+  // Fetch stored Arabic level from user settings
+  let arabicLevel = null;
+  try {
+    const storedSettings = await getItem(`USER#${userId}`, "SETTINGS");
+    if (storedSettings?.arabicLevel) {
+      arabicLevel = storedSettings.arabicLevel;
+    }
+  } catch (err) {
+    console.error("Failed to fetch stored settings:", err);
+  }
+
+  if (!arabicLevel) {
+    return {
+      statusCode: 400,
+      body: {
+        error: "Bad Request",
+        message: "arabicLevel is required (set your Arabic level in settings)",
+      },
+    };
+  }
+
+  console.log("prepareSession settings:", { arabicLevel, familiarity, userId });
 
   if (!pages && !surah) {
     return {
@@ -301,27 +371,92 @@ export async function prepareSession(body, userId) {
     .map((v) => `[${v.verseKey}] ${v.arabic}\nTranslation: ${v.translation}`)
     .join("\n\n");
 
-  const prompt = `You are a Quran study assistant helping a reader prepare for recitation.
 
-PASSAGE CONTENT (${passageLabel}):
+  const excludedWords = arabicLevel === 'advanced'
+    ? [...highFrequencyWords.words, ...commonWords.words]
+    : arabicLevel === 'intermediate'
+      ? highFrequencyWords.words
+      : []  // 'beginner' gets no exclusions
+
+  const prompt = `You are a Quran study assistant. Your sole source of information is the passage provided below — do not draw on outside knowledge, tafsir, or hadith.
+
+---
+PASSAGE (${passageLabel}):
 ${passageContent}
+---
 
-READER FAMILIARITY: ${familiarity}
-- "new" means the reader has never recited this passage before. Focus on foundational vocabulary and core themes.
-- "somewhat_familiar" means the reader has some exposure. Highlight nuances and connections between verses.
-- "well_known" means the reader knows this passage well. Focus on deeper linguistic insights and advanced vocabulary.
+ARABIC LEVEL: "${arabicLevel}"
+SURAH FAMILIARITY: "${familiarity}"
 
-TASK:
-1. Provide exactly 3 bullet points summarizing the key themes of this passage. Each bullet should be one concise sentence.
-2. Provide exactly 20 keywords from the passage, ordered from most important to least important. Each keyword should include the Arabic word, its English translation, a short contextual hint, and a type ("focus" for essential vocabulary, "advanced" for deeper study).
+SUMMARY TASK:
+Write exactly 3 bullet points summarizing the passage's key themes.
+Calibrate tone and depth to SURAH FAMILIARITY:
+- "new": plain language, literal meaning, no assumed structural knowledge
+- "somewhat_familiar": identify thematic links between verses, note structure
+- "well_known": linguistic and rhetorical depth, word-choice precision
+Each bullet is one complete sentence derived strictly from the passage text.
 
-Return ONLY valid JSON with this exact shape, no extra text:
+KEYWORD TASK:
+Extract exactly 30 keywords directly from the passage.
+
+STEP 1 — KEYWORD SELECTION:
+Calibrate the word list strictly to ARABIC LEVEL. A beginner needs the 
+building blocks of the passage — include common and high-frequency Quranic 
+vocabulary. An intermediate reader already knows everyday Quranic nouns, 
+verbs, and prepositions — skip these unless they carry an unusual meaning 
+here. An advanced reader knows the Quranic lexicon broadly — only surface 
+words that are rare, morphologically complex, or semantically nuanced in 
+this specific passage. When in doubt, ask: would a reader at this level 
+already know this word from general Quran exposure? If yes, leave it out.
+
+STEP 2 — RANK by semantic centrality: ask yourself "if the reader understood 
+only the first 5 words on this list, how much of this passage's core message 
+would they grasp?" That answer should be: most of it. Do NOT rank by position 
+in the text.
+
+STEP 3 — LABEL each keyword:
+- "focus"    → essential for understanding this passage's core message
+- "advanced" → morphologically complex, rare, or semantically nuanced
+
+Apply this type ratio based on ARABIC LEVEL:
+- "beginner":               18 focus, 2 advanced
+- "intermediate": 12 focus, 8 advanced  
+- "advanced":        5 focus,  15 advanced
+
+STEP 4 — VOCALIZATION: Every "arabic" value MUST include full harakāt 
+(tashkīl). If the source text is unvocalized, reconstruct the standard 
+Quranic vocalization. A keyword without complete harakāt is invalid.
+
+STEP 5 - For each word, also return its base form (lemma/root).
+
+Return JSON like:
+[
+  { "word": "كفروا", "lemma": "كفر" },
+  { "word": "قالوا", "lemma": "قال" }
+]
+
+Return ONLY valid JSON — no markdown, no commentary, no trailing text.
+
+VALIDATION RULES:
+- "overview" must contain exactly 3 strings
+- "keywords" must contain exactly 20 objects
+- Every "arabic" value must carry full harakāt
+- "translation" must be a short phrase, not a sentence (save explanation for "hint")
+- "hint" must explain why THIS word matters at THIS arabic level
+
 {
-  "overview": ["bullet 1", "bullet 2", "bullet 3"],
+  "overview": ["string", "string", "string"],
   "keywords": [
-    { "arabic": "string", "translation": "string", "hint": "string", "type": "focus | advanced" }
+    {
+      "arabic": "string",
+      "transliteration": "string",
+      "translation": "string",
+      "hint": "string",
+      "type": "focus | advanced",
+      "lemma": "string"
+    }
   ]
-}`;
+}`
 
   const raw = await invokeAgent(prompt, userId);
 
@@ -336,12 +471,28 @@ Return ONLY valid JSON with this exact shape, no extra text:
 
   const sessionId = randomUUID();
 
+  // Filter 1: remove level-based excluded words (high-frequency / common Quranic)
+  const exclusionSet = buildExclusionSet(excludedWords);
+  const afterExclusions = (parsed.keywords ?? []).filter(
+    k => !isExcluded(k.lemma || k.arabic, exclusionSet)
+  );
+
+  // Filter 2: remove user's known keywords from DB
+  const finalKeywords = filterKnownKeywords(afterExclusions, knownArabicSet).slice(0, 20);
+
+  console.log("prepareSession result:", {
+    arabicLevel,
+    familiarity,
+    keywordCount: finalKeywords.length,
+    keywords: finalKeywords.map(k => ({ arabic: k.arabic, type: k.type })),
+  });
+
   return {
     statusCode: 200,
     body: {
       sessionId,
       overview: parsed.overview ?? [],
-      keywords: filterKnownKeywords(parsed.keywords ?? [], knownArabicSet).slice(0, 20),
+      keywords: finalKeywords,
     },
   };
 }

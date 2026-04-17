@@ -33,6 +33,68 @@ describe('filterKnownKeywords', () => {
     expect(result).toEqual([]);
   });
 
+  /** Validates: Requirement 2.2 — lemma matches known set, arabic does not */
+  it('excludes keyword when lemma matches known set but arabic does not', () => {
+    const keywords = [
+      { arabic: 'كَفَرُوا', lemma: 'كفر', translation: 'they disbelieved', hint: 'root verb', type: 'focus' },
+      { arabic: 'نور', translation: 'light', hint: 'noun', type: 'focus' },
+    ];
+    const knownSet = new Set(['كفر']);
+
+    const result = filterKnownKeywords(keywords, knownSet);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].arabic).toBe('نور');
+  });
+
+  /** Validates: Requirement 2.3 — falls back to arabic when lemma is undefined */
+  it('uses arabic for comparison when lemma is undefined', () => {
+    const keywords = [
+      { arabic: 'بسم', lemma: undefined, translation: 'In the name', hint: 'opening', type: 'focus' },
+    ];
+    const knownSet = new Set(['بسم']);
+
+    const result = filterKnownKeywords(keywords, knownSet);
+
+    expect(result).toEqual([]);
+  });
+
+  /** Validates: Requirement 2.3 — falls back to arabic when lemma is null */
+  it('uses arabic for comparison when lemma is null', () => {
+    const keywords = [
+      { arabic: 'الله', lemma: null, translation: 'God', hint: 'divine name', type: 'focus' },
+    ];
+    const knownSet = new Set(['الله']);
+
+    const result = filterKnownKeywords(keywords, knownSet);
+
+    expect(result).toEqual([]);
+  });
+
+  /** Validates: Requirement 2.3 — falls back to arabic when lemma is empty string */
+  it('uses arabic for comparison when lemma is empty string', () => {
+    const keywords = [
+      { arabic: 'الرحمن', lemma: '', translation: 'The Most Gracious', hint: 'attribute', type: 'advanced' },
+    ];
+    const knownSet = new Set(['الرحمن']);
+
+    const result = filterKnownKeywords(keywords, knownSet);
+
+    expect(result).toEqual([]);
+  });
+
+  /** Validates: Requirement 2.3 — falls back to arabic when lemma property is absent */
+  it('uses arabic for comparison when lemma property is missing', () => {
+    const keywords = [
+      { arabic: 'نور', translation: 'light', hint: 'noun', type: 'focus' },
+    ];
+    const knownSet = new Set(['نور']);
+
+    const result = filterKnownKeywords(keywords, knownSet);
+
+    expect(result).toEqual([]);
+  });
+
   /** Validates: Requirement 2.1 — partially overlapping known set */
   it('returns only unknown keywords in original order', () => {
     const keywords = [
@@ -58,12 +120,14 @@ describe('filterKnownKeywords', () => {
 const mockState = vi.hoisted(() => ({
   queryItemsFn: vi.fn(),
   putItemFn: vi.fn(),
+  getItemFn: vi.fn(),
   agentResponse: null,
 }));
 
 vi.mock('../../src/db.mjs', () => ({
   queryItems: (...args) => mockState.queryItemsFn(...args),
   putItem: (...args) => mockState.putItemFn(...args),
+  getItem: (...args) => mockState.getItemFn(...args),
   updateItem: vi.fn(),
 }));
 
@@ -99,6 +163,7 @@ describe('prepareSession — DynamoDB query', () => {
   beforeEach(() => {
     mockState.queryItemsFn.mockReset();
     mockState.putItemFn.mockReset();
+    mockState.getItemFn.mockReset();
     mockState.agentResponse = JSON.stringify({
       overview: ['theme 1', 'theme 2', 'theme 3'],
       keywords: [
@@ -107,6 +172,8 @@ describe('prepareSession — DynamoDB query', () => {
     });
     // Default: return empty known keywords
     mockState.queryItemsFn.mockResolvedValue([]);
+    // Default: return beginner level (no exclusions)
+    mockState.getItemFn.mockResolvedValue({ arabicLevel: 'beginner' });
   });
 
   /** Validates: Requirements 1.1, 1.2 */
@@ -118,6 +185,39 @@ describe('prepareSession — DynamoDB query', () => {
       `USER#${userId}`,
       'KEYWORD#'
     );
+  });
+});
+
+describe('prepareSession — Filter 1 lemma-based exclusion', () => {
+  beforeEach(() => {
+    mockState.queryItemsFn.mockReset();
+    mockState.putItemFn.mockReset();
+    mockState.getItemFn.mockReset();
+    // No known keywords in DB
+    mockState.queryItemsFn.mockResolvedValue([]);
+  });
+
+  /** Validates: Requirement 2.1 — Filter 1 excludes keyword when lemma matches exclusion set */
+  it('excludes keyword whose lemma matches exclusion set but arabic does not', async () => {
+    // 'صبر' is in common_Quranic_words.json → included in advanced exclusion set
+    // 'صَابِرِينَ' normalizes to 'صابرين' which is NOT in any exclusion list
+    mockState.getItemFn.mockResolvedValue({ arabicLevel: 'advanced' });
+    mockState.agentResponse = JSON.stringify({
+      overview: ['theme 1', 'theme 2', 'theme 3'],
+      keywords: [
+        { arabic: 'صَابِرِينَ', lemma: 'صبر', translation: 'the patient ones', hint: 'virtue', type: 'focus' },
+        { arabic: 'تَبَارَكَ', translation: 'blessed', hint: 'praise', type: 'focus' },
+      ],
+    });
+
+    const result = await prepareSession({ pages: '1', familiarity: 'new' }, 'user-test');
+
+    expect(result.statusCode).toBe(200);
+    // 'صَابِرِينَ' should be excluded because its lemma 'صبر' is in the exclusion set
+    const arabicValues = result.body.keywords.map(k => k.arabic);
+    expect(arabicValues).not.toContain('صَابِرِينَ');
+    // 'تَبَارَكَ' has no lemma and doesn't match exclusion set → should remain
+    expect(arabicValues).toContain('تَبَارَكَ');
   });
 });
 
