@@ -4,6 +4,10 @@ class SelectionTracker {
   final Map<String, _TrackerEntry> _records = {};
 
   void record(String arabic, String translation, String status) {
+    if (status != 'known' && status != 'not_known') {
+      throw ArgumentError(
+          'Invalid status: $status. Must be "known" or "not_known".');
+    }
     _records[arabic] = _TrackerEntry(translation: translation, status: status);
   }
 

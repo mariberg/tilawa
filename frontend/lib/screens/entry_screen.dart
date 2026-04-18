@@ -112,6 +112,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
 
   final SurahService _surahService = SurahService();
   final TextEditingController _textController = TextEditingController();
+  final _familiarityKey = GlobalKey<FamiliarityPillsState>();
 
   List<Surah>? _surahs;
   Surah? _selectedSurah;
@@ -215,7 +216,9 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
       _textController.clear();
       _selectedSurah = null;
       _error = null;
+      _familiarity = 'New';
     });
+    _familiarityKey.currentState?.reset();
     _loadRecentSessions();
   }
 
@@ -304,23 +307,22 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
   /// Validates page input. Only accepts a single number (e.g. "50")
   /// or a range with a dash (e.g. "50-54" or "50–54"). Returns the
   /// normalized pages string (using "-") or null if input is not pages.
-  /// Throws if the format starts with a digit but is invalid.
+  /// Throws [FormatException] if the format is invalid or bounds are violated.
   String? _parsePages(String input) {
     final trimmed = input.trim();
     if (trimmed.isEmpty) return null;
     // Not a page input if it doesn't start with a digit
     if (!RegExp(r'^\d').hasMatch(trimmed)) return null;
-    // Single page number
-    if (RegExp(r'^\d+$').hasMatch(trimmed)) return trimmed;
-    // Range like "50-54" or "50–54" (with optional spaces around dash)
-    final rangeMatch = RegExp(r'^(\d+)\s*[-–]\s*(\d+)$').firstMatch(trimmed);
-    if (rangeMatch != null) {
-      return '${rangeMatch.group(1)}-${rangeMatch.group(2)}';
+    // Delegate to parsePageRange() for format + bounds validation.
+    // FormatException from bounds checks propagates to _prepare()'s catch block.
+    final result = parsePageRange(trimmed);
+    if (result == null) {
+      // Input starts with a digit but doesn't match any valid pattern.
+      throw FormatException(
+        'Invalid page format. Use a single page (e.g. 50) or a range (e.g. 50-54).',
+      );
     }
-    // Anything else starting with a digit is invalid (commas, spaces, etc.)
-    throw FormatException(
-      'Invalid page format. Use a single page (e.g. 50) or a range (e.g. 50-54).',
-    );
+    return formatPageRange(result.start, result.end);
   }
 
   Future<void> _prepare() async {
@@ -546,6 +548,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
               Text('FAMILIARITY', style: AppTextStyles.label),
               const SizedBox(height: 10),
               FamiliarityPills(
+                key: _familiarityKey,
                 onChanged: (value) => _familiarity = value,
               ),
               const SizedBox(height: 28),

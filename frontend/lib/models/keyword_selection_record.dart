@@ -1,4 +1,6 @@
 class KeywordSelectionRecord {
+  static const validStatuses = {'known', 'not_known'};
+
   final String arabic;
   final String translation;
   final String status;
@@ -7,7 +9,7 @@ class KeywordSelectionRecord {
     required this.arabic,
     required this.translation,
     required this.status,
-  });
+  }) : assert(status == 'known' || status == 'not_known');
 
   factory KeywordSelectionRecord.fromJson(Map<String, dynamic> json) {
     if (!json.containsKey('arabic') || json['arabic'] == null) {
@@ -20,10 +22,15 @@ class KeywordSelectionRecord {
       throw FormatException('Missing required field: status');
     }
 
+    final status = json['status'] as String;
+    if (!validStatuses.contains(status)) {
+      throw FormatException('Invalid status: $status');
+    }
+
     return KeywordSelectionRecord(
       arabic: json['arabic'] as String,
       translation: json['translation'] as String,
-      status: json['status'] as String,
+      status: status,
     );
   }
 

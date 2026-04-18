@@ -31,7 +31,7 @@ void main() {
           KeywordSelectionRecord(
             arabic: 'هُدًى',
             translation: 'guidance',
-            status: 'not_sure',
+            status: 'not_known',
           ),
         ],
       );
@@ -47,7 +47,7 @@ void main() {
           KeywordSelectionRecord(
             arabic: 'تَقْوَى',
             translation: 'piety',
-            status: 'review',
+            status: 'not_known',
           ),
         ],
       );
@@ -78,7 +78,7 @@ void main() {
         'surah': 1,
         'durationSecs': 80,
         'keywords': [
-          {'arabic': 'هُدًى', 'translation': 'guidance', 'status': 'review'},
+          {'arabic': 'هُدًى', 'translation': 'guidance', 'status': 'not_known'},
         ],
       });
       expect(payload.surah, 1);
@@ -98,7 +98,7 @@ void main() {
           KeywordSelectionRecord(
             arabic: 'هُدًى',
             translation: 'guidance',
-            status: 'not_sure',
+            status: 'not_known',
           ),
         ],
       );

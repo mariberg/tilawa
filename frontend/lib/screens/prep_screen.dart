@@ -96,9 +96,9 @@ class _PrepScreenState extends State<PrepScreen> {
     });
   }
 
-  void _handleNotSureOrReview(String status) {
+  void _handleNotKnown() {
     final currentKeyword = _manager.visibleKeywords[currentIndex];
-    _tracker.record(currentKeyword.arabic, currentKeyword.translation, status);
+    _tracker.record(currentKeyword.arabic, currentKeyword.translation, 'not_known');
 
     final isLastCard = currentIndex == _manager.totalVisible - 1;
     if (isLastCard) {
@@ -116,9 +116,7 @@ class _PrepScreenState extends State<PrepScreen> {
     if (stateValue == 1) {
       _handleKnown();
     } else if (stateValue == 2) {
-      _handleNotSureOrReview('not_sure');
-    } else if (stateValue == 3) {
-      _handleNotSureOrReview('review');
+      _handleNotKnown();
     }
   }
 
@@ -241,9 +239,7 @@ class _PrepScreenState extends State<PrepScreen> {
                       children: [
                         _actionBtn('✓ Known', 1),
                         const SizedBox(width: 8),
-                        _actionBtn('? Not sure', 2),
-                        const SizedBox(width: 8),
-                        _actionBtn('↻ Review', 3),
+                        _actionBtn('✗ Not known', 2),
                       ],
                     ),
                   ),

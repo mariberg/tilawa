@@ -1,3 +1,6 @@
+/// The total number of pages in the Quran.
+const maxQuranPage = 604;
+
 /// Parses a pages string into (start, end, span).
 ///
 /// Accepts formats: "Pages {start}–{end}", "Pages {start}", "{start}-{end}", "{start}".

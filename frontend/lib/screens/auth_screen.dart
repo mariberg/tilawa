@@ -4,13 +4,16 @@ import 'dart:html' as html;
 import 'dart:js' as js;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../services/auth_service.dart';
 import '../services/level_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
 /// The redirect URI registered with the OAuth2 provider.
-const String _kRedirectUri = 'http://localhost:5000/auth/callback';
+/// Falls back to localhost for local development.
+String get _kRedirectUri =>
+    dotenv.env['REDIRECT_URI'] ?? 'http://localhost:5000/auth/callback';
 
 class AuthScreen extends StatefulWidget {
   /// OAuth2 callback parameters extracted from the browser URL on app init.

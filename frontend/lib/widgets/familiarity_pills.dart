@@ -8,13 +8,17 @@ class FamiliarityPills extends StatefulWidget {
   const FamiliarityPills({super.key, this.onChanged});
 
   @override
-  State<FamiliarityPills> createState() => _FamiliarityPillsState();
+  State<FamiliarityPills> createState() => FamiliarityPillsState();
 }
 
-class _FamiliarityPillsState extends State<FamiliarityPills> {
+class FamiliarityPillsState extends State<FamiliarityPills> {
   int _selected = -1;
 
   static const _options = ['New', 'Somewhat familiar', 'Well known'];
+
+  void reset() {
+    setState(() => _selected = -1);
+  }
 
   @override
   Widget build(BuildContext context) {
