@@ -159,39 +159,64 @@ function parsePageRange(pages) {
 }
 
 /**
- * Resolves session parameters to chapter and verse numbers for the Reading Sessions API.
+ * Resolves session parameters to chapter/verse numbers and verse key range.
  *
  * @param {string|number|undefined} surah - Surah number if provided
  * @param {string|undefined} pages - Page range string if provided (e.g. "50-54")
- * @returns {Promise<{chapterNumber: number, verseNumber: number}>}
+ * @returns {Promise<{chapterNumber: number, verseNumber: number, startVerseKey: string, endVerseKey: string}>}
  */
 async function resolveChapterAndVerse(surah, pages) {
   console.log("resolveChapterAndVerse called with:", { surah, pages });
   if (surah != null) {
-    console.log("Using surah path:", { chapterNumber: Number(surah), verseNumber: 1 });
-    return { chapterNumber: Number(surah), verseNumber: 1 };
+    const verses = await fetchVersesForChapter(Number(surah));
+    if (!verses || verses.length === 0) {
+      throw new Error(`No verses returned for chapter ${surah}`);
+    }
+    const lastVerse = verses[verses.length - 1];
+    const lastVerseNumber = Number(lastVerse.verseKey.split(":")[1]);
+    const startVerseKey = `${Number(surah)}:1`;
+    const endVerseKey = lastVerse.verseKey;
+    console.log("Using surah path:", { chapterNumber: Number(surah), verseNumber: lastVerseNumber, startVerseKey, endVerseKey });
+    return { chapterNumber: Number(surah), verseNumber: lastVerseNumber, startVerseKey, endVerseKey };
   }
 
   const pageNumbers = parsePageRange(pages);
   const firstPage = pageNumbers[0];
-  console.log("Using pages path, fetching verses for page:", firstPage);
-  const verses = await fetchVersesForPage(firstPage);
+  const lastPage = pageNumbers[pageNumbers.length - 1];
+  console.log("Using pages path, fetching verses for first page:", firstPage, "last page:", lastPage);
 
-  if (!verses || verses.length === 0) {
+  const firstPageVerses = await fetchVersesForPage(firstPage);
+  if (!firstPageVerses || firstPageVerses.length === 0) {
     throw new Error(`No verses returned for page ${firstPage}`);
   }
 
-  const verseKey = verses[0].verseKey;
-  if (!verseKey || !verseKey.includes(":")) {
-    throw new Error(`Invalid verse_key format: ${verseKey}`);
+  const startVerseKey = firstPageVerses[0].verseKey;
+  if (!startVerseKey || !startVerseKey.includes(":")) {
+    throw new Error(`Invalid verse_key format: ${startVerseKey}`);
   }
 
-  const [chapter, verse] = verseKey.split(":").map(Number);
+  // Fetch last page verses (may be the same page for single-page ranges)
+  let endVerseKey;
+  if (lastPage === firstPage) {
+    endVerseKey = firstPageVerses[firstPageVerses.length - 1].verseKey;
+  } else {
+    const lastPageVerses = await fetchVersesForPage(lastPage);
+    if (!lastPageVerses || lastPageVerses.length === 0) {
+      throw new Error(`No verses returned for page ${lastPage}`);
+    }
+    endVerseKey = lastPageVerses[lastPageVerses.length - 1].verseKey;
+  }
+
+  if (!endVerseKey || !endVerseKey.includes(":")) {
+    throw new Error(`Invalid verse_key format: ${endVerseKey}`);
+  }
+
+  const [chapter, verse] = startVerseKey.split(":").map(Number);
   if (Number.isNaN(chapter) || Number.isNaN(verse)) {
-    throw new Error(`Failed to parse verse_key: ${verseKey}`);
+    throw new Error(`Failed to parse verse_key: ${startVerseKey}`);
   }
 
-  return { chapterNumber: chapter, verseNumber: verse };
+  return { chapterNumber: chapter, verseNumber: verse, startVerseKey, endVerseKey };
 }
 
 /**
@@ -233,6 +258,59 @@ async function syncReadingSession(chapterNumber, verseNumber, userAccessToken) {
     }
   } catch (err) {
     console.error("Reading session sync error:", err);
+  }
+}
+
+/**
+ * Syncs a completed session to the Quran.com Activity Days API.
+ * Fire-and-forget: logs errors but never throws.
+ *
+ * @param {string} startVerseKey - e.g. "2:1"
+ * @param {string} endVerseKey - e.g. "2:5"
+ * @param {number} durationSecs - Session duration in seconds (integer >= 1)
+ * @param {string} userAccessToken - The user's OAuth2 access token
+ */
+async function syncActivityDay(startVerseKey, endVerseKey, durationSecs, userAccessToken) {
+  try {
+    if (!userAccessToken || userAccessToken === "") {
+      console.warn("syncActivityDay: missing user access token, skipping sync");
+      return;
+    }
+
+    if (!Number.isInteger(durationSecs) || durationSecs < 1) {
+      console.warn("syncActivityDay: invalid durationSecs, skipping sync:", durationSecs);
+      return;
+    }
+
+    const requestBody = {
+      type: "QURAN",
+      seconds: durationSecs,
+      ranges: [`${startVerseKey}-${endVerseKey}`],
+      mushafId: 4,
+    };
+    console.log("Syncing activity day:", requestBody);
+
+    const res = await fetch(
+      "https://apis-prelive.quran.foundation/auth/v1/activity-days",
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": userAccessToken,
+          "x-client-id": process.env.QF_PRELIVE_CLIENT_ID,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("Activity Days API error:", res.status, errBody);
+    } else {
+      console.log("Activity day synced:", { startVerseKey, endVerseKey, durationSecs });
+    }
+  } catch (err) {
+    console.error("Activity day sync error:", err);
   }
 }
 
@@ -564,12 +642,24 @@ export async function createSession(body, userId, userAccessToken) {
     );
   }
 
-  // Fire-and-forget sync to Quran.com Reading Sessions API
+  // Fire-and-forget syncs to Quran.com APIs
   try {
-    const { chapterNumber, verseNumber } = await resolveChapterAndVerse(surah, pages);
-    await syncReadingSession(chapterNumber, verseNumber, userAccessToken);
+    const { chapterNumber, verseNumber, startVerseKey, endVerseKey } =
+      await resolveChapterAndVerse(surah, pages);
+
+    try {
+      await syncReadingSession(chapterNumber, verseNumber, userAccessToken);
+    } catch (err) {
+      console.error("Reading session sync failed:", err);
+    }
+
+    try {
+      await syncActivityDay(startVerseKey, endVerseKey, durationSecs, userAccessToken);
+    } catch (err) {
+      console.error("Activity day sync failed:", err);
+    }
   } catch (err) {
-    console.error("Reading session sync failed:", err);
+    console.error("Verse resolution failed, skipping syncs:", err);
   }
 
   return {
