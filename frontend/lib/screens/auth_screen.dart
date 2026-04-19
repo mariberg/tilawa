@@ -145,17 +145,23 @@ class _AuthScreenState extends State<AuthScreen> {
             children: [
               const Spacer(),
               Text(
-                'Welcome back',
-                style: AppTextStyles.h1.copyWith(fontSize: 32),
+                'Tilawa',
+                style: AppTextStyles.h1.copyWith(fontSize: 38),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 36),
+              Text(
+                'Your recitation preparation starts here.',
+                style: AppTextStyles.h1.copyWith(fontSize: 24),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                'Sign in to continue your preparation',
+                'Sign in to begin your session.',
                 style: AppTextStyles.displayBody.copyWith(fontSize: 18),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 26),
               // --- Mock auth form elements below are commented out (replaced by OAuth2 login flow) ---
               // const SizedBox(height: 40),
               // // Username
