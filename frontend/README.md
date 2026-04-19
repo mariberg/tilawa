@@ -1,6 +1,6 @@
 # Tilawa
 
-A Flutter web app that helps users prepare for Quranic recitation sessions. Select a surah or page range, review keyword flashcards, record your recitation, and track your progress over time.
+A mobile-first Flutter web app that helps users prepare for Quranic recitation sessions. Select a surah or page range, review keyword flashcards, record your recitation, and track your progress over time.
 
 ## Features
 
@@ -12,6 +12,11 @@ A Flutter web app that helps users prepare for Quranic recitation sessions. Sele
 - **Session Feedback** — Rate sessions as smooth, struggled, or revisit
 - **Recent Sessions** — View and quickly resume past sessions
 - **Loading Messages** — Contextual messages displayed while sessions are being prepared
+
+## Design Approach
+
+- **Mobile-First** — The app is designed primarily for mobile usage, with layouts and interactions optimized for small screens. This allows a seamless transition to a native mobile app in the future, which aligns with the primary use case of recitation on-the-go.
+- **Session-Based Flow** — Users move through a structured flow (selection → preparation → recitation → feedback) to mimic real learning sessions.
 
 ## Tech Stack
 

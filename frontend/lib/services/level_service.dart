@@ -36,9 +36,6 @@ class LevelService {
       'x-api-key': apiKey,
     };
 
-    print('[LevelService] GET $url');
-    print('[LevelService] Headers: ${headers.map((k, v) => MapEntry(k, k == 'x-api-key' ? '***' : v))}');
-
     final httpClient = client ?? http.Client();
     try {
       final response = await httpClient.get(
@@ -46,11 +43,7 @@ class LevelService {
         headers: headers,
       );
 
-      print('[LevelService] Response status: ${response.statusCode}');
-      print('[LevelService] Response body: ${response.body}');
-
       if (response.statusCode != 200) {
-        print('[LevelService] Fetch level failed: status ${response.statusCode}');
         return null;
       }
 
@@ -59,7 +52,6 @@ class LevelService {
       _currentLevel = level;
       return level;
     } catch (e) {
-      print('[LevelService] Fetch level error: $e');
       return null;
     } finally {
       if (client == null) {
@@ -96,10 +88,6 @@ class LevelService {
       'x-api-key': apiKey,
     };
 
-    print('[LevelService] PUT $url');
-    print('[LevelService] Headers: ${headers.map((k, v) => MapEntry(k, k == 'x-api-key' ? '***' : v))}');
-    print('[LevelService] Body: $encodedBody');
-
     final httpClient = client ?? http.Client();
     try {
       final response = await httpClient.put(
@@ -107,9 +95,6 @@ class LevelService {
         headers: headers,
         body: encodedBody,
       );
-
-      print('[LevelService] Response status: ${response.statusCode}');
-      print('[LevelService] Response body: ${response.body}');
 
       if (response.statusCode != 200) {
         throw Exception(

@@ -99,7 +99,6 @@ class _AuthScreenState extends State<AuthScreen> {
     });
 
     final result = _authService.buildAuthorizationUrl(_kRedirectUri);
-    print('[AuthScreen] Redirecting to: ${result.url}');
     // Use raw JS to force navigation — bypasses Flutter's service worker.
     js.context.callMethod('eval', ['window.location.replace("${result.url}")']);
   }

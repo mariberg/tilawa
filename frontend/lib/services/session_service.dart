@@ -57,10 +57,6 @@ class SessionService {
       'x-api-key': apiKey,
     };
 
-    print('[SessionService] POST $url');
-    print('[SessionService] Headers: ${headers.map((k, v) => MapEntry(k, k == 'x-api-key' ? '***' : v))}');
-    print('[SessionService] Body: $encodedBody');
-
     final httpClient = client ?? http.Client();
     try {
       final response = await httpClient.post(
@@ -68,10 +64,6 @@ class SessionService {
         headers: headers,
         body: encodedBody,
       );
-
-      print('[SessionService] Response status: ${response.statusCode}');
-      print('[SessionService] Response headers: ${response.headers}');
-      print('[SessionService] Response body: ${response.body}');
 
       if (response.statusCode != 200) {
         throw Exception(
@@ -116,10 +108,6 @@ class SessionService {
       'x-api-key': apiKey,
     };
 
-    print('[SessionService] POST $url');
-    print('[SessionService] Headers: ${headers.map((k, v) => MapEntry(k, k == 'x-api-key' ? '***' : v))}');
-    print('[SessionService] Body: $encodedBody');
-
     final httpClient = client ?? http.Client();
     try {
       final response = await httpClient.post(
@@ -127,10 +115,6 @@ class SessionService {
         headers: headers,
         body: encodedBody,
       );
-
-      print('[SessionService] Response status: ${response.statusCode}');
-      print('[SessionService] Response headers: ${response.headers}');
-      print('[SessionService] Response body: ${response.body}');
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception(
@@ -177,10 +161,6 @@ class SessionService {
       'x-api-key': apiKey,
     };
 
-    print('[SessionService] PATCH $url');
-    print('[SessionService] Headers: ${headers.map((k, v) => MapEntry(k, k == 'x-api-key' ? '***' : v))}');
-    print('[SessionService] Body: $encodedBody');
-
     final httpClient = client ?? http.Client();
     try {
       final response = await httpClient.patch(
@@ -188,10 +168,6 @@ class SessionService {
         headers: headers,
         body: encodedBody,
       );
-
-      print('[SessionService] Response status: ${response.statusCode}');
-      print('[SessionService] Response headers: ${response.headers}');
-      print('[SessionService] Response body: ${response.body}');
 
       if (response.statusCode != 200) {
         throw Exception(
@@ -226,19 +202,12 @@ class SessionService {
       'x-api-key': apiKey,
     };
 
-    print('[SessionService] GET $url');
-    print('[SessionService] Headers: ${headers.map((k, v) => MapEntry(k, k == 'x-api-key' ? '***' : v))}');
-
     final httpClient = client ?? http.Client();
     try {
       final response = await httpClient.get(
         Uri.parse(url),
         headers: headers,
       );
-
-      print('[SessionService] Response status: ${response.statusCode}');
-      print('[SessionService] Response headers: ${response.headers}');
-      print('[SessionService] Response body: ${response.body}');
 
       if (response.statusCode != 200) {
         throw Exception(
