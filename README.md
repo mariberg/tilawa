@@ -1,25 +1,11 @@
 # 📖 Tilawa
 
+_Your mind arrives, before your voice does._
+
 A context-aware preparation engine for Quranic recitation. Tilawa generates **personalized summaries and keywords** based on user level and preferences using AWS serverless architecture and Amazon Nova (LLM).
 
 ---
 
-## 🚀 Live Demo
-
-👉 **Deployed App:** http://tilawa.s3-website-us-east-1.amazonaws.com
-
-The app is fully deployed and ready to test.
-
-### 🔐 Test Access
-
-This application uses **Quran Foundation pre-production credentials**.
-
-Judges can log in using the provided hackathon credentials:
-
-* OAuth2 login via Quran Foundation
-* No setup required
-
----
 
 ## 🧠 What this project does
 
@@ -58,11 +44,25 @@ AWS Lambda (Core Orchestration)
           Frontend Response
 ```
 
+![tilawa_diagram](/assets/tilawa_diagram.png)
+
+
 ---
 
-## 🧩 Key Idea
+## 🚀 Live Demo
 
-The AI does not just summarize content — it **personalizes it based on user reading level and preferences**, creating a tailored learning experience instead of a static explanation.
+👉 **Deployed App:** http://tilawa.s3-website-us-east-1.amazonaws.com
+
+The app is fully deployed and ready to test.
+
+### 🔐 Test Access
+
+This application uses **Quran Foundation pre-production credentials**.
+
+Judges can log in using the provided hackathon credentials:
+
+* OAuth2 login via Quran Foundation
+* No setup required
 
 ---
 
@@ -125,22 +125,6 @@ This project fulfills the following technical requirements:
 
 * OAuth2 integration via Quran Foundation
 
-### 📦 Data Layer
-
-* DynamoDB for storing user preferences
-* Quran Foundation API integration for Quran content + sessions
-
-### 🔄 System Design
-
-* Separation of concerns:
-
-  * Frontend (Flutter UI)
-  * Backend (AWS orchestration)
-  * AI layer (Bedrock)
-  * External APIs (Quran Foundation)
-
-![architecture_diagram](./assets/tilawa_diagram.png)
-
 ---
 
 
@@ -159,3 +143,6 @@ This project fulfills the following technical requirements:
 
 ---
 
+
+
+[def]: ./assets/tilawa_diagram.png
