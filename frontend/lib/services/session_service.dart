@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../config.dart';
 import '../models/recent_session.dart';
 import '../models/session_response.dart';
 import '../models/session_result_payload.dart';
@@ -26,13 +26,13 @@ class SessionService {
       throw ArgumentError('Either pages or surah is required');
     }
 
-    final baseUrl = dotenv.env['BASE_URL'];
-    if (baseUrl == null || baseUrl.isEmpty) {
+    final baseUrl = AppConfig.baseUrl;
+    if (baseUrl.isEmpty) {
       throw Exception('BASE_URL is not configured');
     }
 
-    final apiKey = dotenv.env['API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
+    final apiKey = AppConfig.apiKey;
+    if (apiKey.isEmpty) {
       throw Exception('API_KEY is not configured');
     }
 
@@ -87,13 +87,13 @@ class SessionService {
     required SessionResultPayload payload,
     http.Client? client,
   }) async {
-    final baseUrl = dotenv.env['BASE_URL'];
-    if (baseUrl == null || baseUrl.isEmpty) {
+    final baseUrl = AppConfig.baseUrl;
+    if (baseUrl.isEmpty) {
       throw Exception('BASE_URL is not configured');
     }
 
-    final apiKey = dotenv.env['API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
+    final apiKey = AppConfig.apiKey;
+    if (apiKey.isEmpty) {
       throw Exception('API_KEY is not configured');
     }
 
@@ -140,13 +140,13 @@ class SessionService {
       throw ArgumentError('Invalid feeling value: $feeling');
     }
 
-    final baseUrl = dotenv.env['BASE_URL'];
-    if (baseUrl == null || baseUrl.isEmpty) {
+    final baseUrl = AppConfig.baseUrl;
+    if (baseUrl.isEmpty) {
       throw Exception('BASE_URL is not configured');
     }
 
-    final apiKey = dotenv.env['API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
+    final apiKey = AppConfig.apiKey;
+    if (apiKey.isEmpty) {
       throw Exception('API_KEY is not configured');
     }
 
@@ -183,13 +183,13 @@ class SessionService {
   Future<List<RecentSession>> fetchRecentSessions({
     http.Client? client,
   }) async {
-    final baseUrl = dotenv.env['BASE_URL'];
-    if (baseUrl == null || baseUrl.isEmpty) {
+    final baseUrl = AppConfig.baseUrl;
+    if (baseUrl.isEmpty) {
       throw Exception('BASE_URL is not configured');
     }
 
-    final apiKey = dotenv.env['API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
+    final apiKey = AppConfig.apiKey;
+    if (apiKey.isEmpty) {
       throw Exception('API_KEY is not configured');
     }
 

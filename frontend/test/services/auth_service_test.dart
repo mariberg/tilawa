@@ -1,11 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:quran_prep/services/auth_service.dart';
 
 void main() {
-  setUpAll(() async {
-    await dotenv.load(fileName: '.env');
-  });
 
   // --- Mock authentication tests (commented out) ---
   // These tests validated the mock auth code (validate(), setUser(),

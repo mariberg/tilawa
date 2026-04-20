@@ -1,6 +1,5 @@
 // App entry point — MaterialApp with routes and theme.
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme/app_colors.dart';
 import 'screens/auth_screen.dart';
 import 'screens/entry_screen.dart';
@@ -30,7 +29,6 @@ final RouteObserver<ModalRoute<void>> routeObserver =
 }
 
 Future<void> main() async {
-  await dotenv.load();
   final oauthCallback = _extractOAuthCallback();
   runApp(QuranPrepApp(oauthCallback: oauthCallback));
 }

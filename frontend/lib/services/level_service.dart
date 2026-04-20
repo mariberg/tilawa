@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../config.dart';
 import 'auth_service.dart';
 
 class LevelService {
@@ -19,13 +19,13 @@ class LevelService {
   /// Returns the level string or null if none is set.
   /// On HTTP failure, returns null (treat as no level).
   Future<String?> fetchLevel({http.Client? client}) async {
-    final baseUrl = dotenv.env['BASE_URL'];
-    if (baseUrl == null || baseUrl.isEmpty) {
+    final baseUrl = AppConfig.baseUrl;
+    if (baseUrl.isEmpty) {
       throw Exception('BASE_URL is not configured');
     }
 
-    final apiKey = dotenv.env['API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
+    final apiKey = AppConfig.apiKey;
+    if (apiKey.isEmpty) {
       throw Exception('API_KEY is not configured');
     }
 
@@ -69,13 +69,13 @@ class LevelService {
       throw ArgumentError('Invalid level value: $level');
     }
 
-    final baseUrl = dotenv.env['BASE_URL'];
-    if (baseUrl == null || baseUrl.isEmpty) {
+    final baseUrl = AppConfig.baseUrl;
+    if (baseUrl.isEmpty) {
       throw Exception('BASE_URL is not configured');
     }
 
-    final apiKey = dotenv.env['API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
+    final apiKey = AppConfig.apiKey;
+    if (apiKey.isEmpty) {
       throw Exception('API_KEY is not configured');
     }
 

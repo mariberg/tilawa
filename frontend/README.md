@@ -26,7 +26,7 @@ A mobile-first Flutter web app that helps users prepare for Quranic recitation s
 - HTTP client for backend API
 - `flutter_typeahead` for surah search
 - `google_fonts` for typography
-- `flutter_dotenv` for environment configuration
+- Compile-time configuration via `--dart-define-from-file`
 
 ## Project Structure
 
@@ -62,25 +62,40 @@ lib/
    flutter pub get
    ```
 
-3. Create a `.env` file from the example:
+3. Create a `config.json` from the example:
    ```bash
-   cp .env.example .env
+   cp config.example.json config.json
    ```
 
-4. Fill in your `.env` values:
+4. Fill in your `config.json` values:
+   ```json
+   {
+     "BASE_URL": "https://your-api-url.com",
+     "API_KEY": "your-api-key-here",
+     "TOKEN_HOST": "https://oauth2.quran.foundation",
+     "CLIENT_ID": "your-client-id",
+     "CLIENT_SECRET": "your-client-secret",
+     "SCOPES": "openid offline_access profile user reading_session activity_day",
+     "REDIRECT_URI": "http://localhost:5000/auth/callback"
+   }
    ```
-   BASE_URL=https://your-api-url.com
-   API_KEY=your-api-key-here
-   TOKEN_HOST=https://oauth2.quran.foundation
-   CLIENT_ID=<your-client-id>
-   CLIENT_SECRET=<your-client-secret>
-   SCOPES=openid offline_access profile bookmark collection user
-   ```
+
+   > **Note:** `config.json` is gitignored and never bundled into the build output as a readable file. Values are injected as compile-time constants into the compiled JS.
+   >
+   > **Security consideration:** Public OAuth2 parameters (`CLIENT_ID`, `TOKEN_HOST`, `SCOPES`, `REDIRECT_URI`) are safe to include — browsers need them to initiate the auth flow. However, `CLIENT_SECRET` and `API_KEY` should ideally be moved to the backend in a production setup. The backend already proxies the token exchange and could hold these secrets server-side.
+   >
+   > For production, set `REDIRECT_URI` to your HTTPS deployment URL (e.g. your CloudFront domain). The OAuth2 provider requires HTTPS for non-localhost redirect URIs.
 
 ### Run
 
 ```bash
-flutter run -d chrome
+flutter run -d chrome --dart-define-from-file=config.json
+```
+
+### Build for production
+
+```bash
+flutter build web --dart-define-from-file=config.json
 ```
 
 ## Testing

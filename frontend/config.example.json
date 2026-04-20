@@ -1,0 +1,9 @@
+{
+  "BASE_URL": "https://your-api-url.execute-api.us-east-1.amazonaws.com/dev",
+  "API_KEY": "your-api-key-here",
+  "TOKEN_HOST": "https://oauth2.quran.foundation",
+  "CLIENT_ID": "your-client-id",
+  "CLIENT_SECRET": "your-client-secret",
+  "SCOPES": "openid offline_access profile user reading_session activity_day",
+  "REDIRECT_URI": "http://localhost:5000/auth/callback"
+}

@@ -3,9 +3,9 @@ import 'dart:math';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../config.dart';
 import '../utils/jwt_utils.dart';
 
 class AuthService {
@@ -67,10 +67,10 @@ class AuthService {
   final http.Client _httpClient;
 
   AuthService({http.Client? client}) : _httpClient = client ?? http.Client() {
-    _tokenHost = dotenv.env['TOKEN_HOST'] ?? '';
-    _clientId = dotenv.env['CLIENT_ID'] ?? '';
-    _clientSecret = dotenv.env['CLIENT_SECRET'] ?? '';
-    _scopes = dotenv.env['SCOPES'] ?? '';
+    _tokenHost = AppConfig.tokenHost;
+    _clientId = AppConfig.clientId;
+    _clientSecret = AppConfig.clientSecret;
+    _scopes = AppConfig.scopes;
   }
 
   bool get isAuthenticated => _accessToken != null && _tokenExpiry != null;
@@ -116,8 +116,8 @@ class AuthService {
     }
 
     // Exchange authorization code for tokens via backend proxy
-    final baseUrl = dotenv.env['BASE_URL'] ?? '';
-    final apiKey = dotenv.env['API_KEY'] ?? '';
+    final baseUrl = AppConfig.baseUrl;
+    final apiKey = AppConfig.apiKey;
     final response = await _httpClient.post(
       Uri.parse('$baseUrl/oauth2/token'),
       headers: {
@@ -181,8 +181,8 @@ class AuthService {
   /// On success, updates stored tokens and expiry.
   /// On failure, clears all tokens and user profile.
   Future<void> refreshAccessToken() async {
-    final baseUrl = dotenv.env['BASE_URL'] ?? '';
-    final apiKey = dotenv.env['API_KEY'] ?? '';
+    final baseUrl = AppConfig.baseUrl;
+    final apiKey = AppConfig.apiKey;
     final response = await _httpClient.post(
       Uri.parse('$baseUrl/oauth2/token'),
       headers: {
