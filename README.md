@@ -59,6 +59,20 @@ AWS Lambda (Core Orchestration)
 
 ![tilawa_diagram](/assets/tilawa_diagram.png)
 
+---
+
+## 🔄 How a Session is Prepared
+
+When a user starts a session, the backend orchestrates several steps to produce personalized preparation material:
+
+1. The user selects a surah or page range and rates their familiarity with the content (new, somewhat familiar, or well known)
+2. The backend retrieves the user's Arabic level (beginner, intermediate, or advanced) from their stored preferences
+3. Verse text and translations are fetched from the Quran Foundation Content API
+4. The passage, familiarity rating, and Arabic level are sent to Amazon Bedrock (Nova Lite), which generates a 3-bullet overview and a ranked list of key vocabulary
+5. The keyword list is then filtered in two passes:
+   - **Level-based filtering** — removes common or high-frequency Quranic words based on the user's Arabic level. Beginners see all words; intermediate users skip common ones; advanced users skip both common and high-frequency words.
+   - **User-specific filtering** — removes any keywords the user has already marked as "known" in previous sessions, so each session only surfaces new vocabulary.
+6. The final overview and up to 20 filtered keywords are returned to the frontend as preparation material
 
 ---
 

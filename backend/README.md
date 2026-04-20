@@ -27,6 +27,19 @@ Built with AWS Lambda, API Gateway, and CloudFormation.
 | POST | `/oauth2/token` | ❌ | OAuth2 token proxy to Quran Foundation |
 
 
+## Session Prep Flow
+
+When the frontend calls `POST /sessions/prepare`, the backend:
+
+1. Receives the surah familiarity level from the frontend request
+2. Retrieves the user's Arabic level from DynamoDB (stored via `PUT /settings`)
+3. Fetches verse text and translations from the Quran Foundation Content API
+4. Sends the passage, familiarity, and Arabic level to Amazon Bedrock, which returns a 3-bullet overview and a ranked keyword list
+5. Filters the returned keywords in two passes:
+   - **Level-based filtering** — removes high-frequency or common Quranic words (from bundled JSON word lists) based on the user's Arabic level. Beginners see all words; intermediate users skip common ones; advanced users skip both common and high-frequency words.
+   - **User-specific filtering** — removes any keywords the user has already marked as "known" in previous sessions (tracked in DynamoDB)
+6. Returns the final overview and up to 20 filtered keywords
+
 ## Infrastructure as Code
 
 All backend infrastructure is defined using AWS CloudFormation (`template.yaml`), including:
@@ -51,10 +64,10 @@ cp .env.example .env
 | Variable | Description |
 |----------|-------------|
 | `TABLE_NAME` | DynamoDB table name |
-| `QF_CLIENT_ID` | Quran.com OAuth2 client ID (production) |
-| `QF_CLIENT_SECRET` | Quran.com OAuth2 client secret (production) |
-| `QF_PRELIVE_CLIENT_ID` | Quran.com OAuth2 client ID (prelive) |
-| `QF_PRELIVE_CLIENT_SECRET` | Quran.com OAuth2 client secret (prelive) |
+| `QF_CLIENT_ID` | Quran Foundation OAuth2 client ID (production) |
+| `QF_CLIENT_SECRET` | Quran Foundation OAuth2 client secret (production) |
+| `QF_PRELIVE_CLIENT_ID` | Quran Foundation OAuth2 client ID (prelive) |
+| `QF_PRELIVE_CLIENT_SECRET` | Quran Foundation OAuth2 client secret (prelive) |
 | `QF_ENV` | `production` or `prelive` (defaults to `prelive`) |
 | `BEDROCK_ROLE_ARN` | Cross-account IAM role ARN for Bedrock access |
 
