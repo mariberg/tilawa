@@ -1,6 +1,6 @@
 # Tilawa Backend
 
-Serverless backend for a Quran study app. Fetches Quran content from the [Quran.com API](https://quran.com), generates AI-powered session prep (summaries and vocabulary) via Amazon Bedrock, and persists user data in DynamoDB.
+Serverless backend for a Quran study app. Fetches Quran content from the [Quran Foundation](https://quran.foundation) Content API, generates AI-powered session prep (summaries and vocabulary) via Amazon Bedrock, syncs reading progress to the Quran Foundation User API (reading sessions and activity days), and persists user data in DynamoDB.
 
 Built with AWS Lambda, API Gateway, and CloudFormation.
 
@@ -21,10 +21,22 @@ Built with AWS Lambda, API Gateway, and CloudFormation.
 | PUT | `/settings` | ✅ | Save user settings (Arabic level) |
 | GET | `/settings` | ✅ | Get user settings |
 | POST | `/sessions/prepare` | ✅ | AI-powered session prep (overview + keywords) |
-| POST | `/sessions` | ✅ | Save a completed session + sync to Quran.com |
+| POST | `/sessions` | ✅ | Save a completed session + sync to Quran Foundation User API |
 | GET | `/sessions/recent` | ✅ | List recent sessions |
 | PATCH | `/sessions/:id/feeling` | ✅ | Update session feeling |
-| POST | `/oauth2/token` | ❌ | OAuth2 token proxy to Quran.com |
+| POST | `/oauth2/token` | ❌ | OAuth2 token proxy to Quran Foundation |
+
+
+## Infrastructure as Code
+
+All backend infrastructure is defined using AWS CloudFormation (`template.yaml`), including:
+
+- Lambda function and permissions
+- API Gateway configuration
+- DynamoDB table
+- IAM roles (including Bedrock access)
+
+This allows the entire backend to be reproducibly deployed with a single command.
 
 ## Setup
 
@@ -76,18 +88,14 @@ src/
 ├── index.mjs          # Lambda handler entry point
 ├── router.mjs         # Route dispatcher
 ├── auth.mjs           # JWT extraction (no verification — relies on API Gateway)
-├── sessions.mjs       # Session prep (Bedrock AI), CRUD, keyword filtering
+├── sessions.mjs       # Session prep (Bedrock AI), CRUD, keyword filtering, Quran Foundation sync
 ├── settings.mjs       # User settings (Arabic level)
 ├── agent.mjs          # Bedrock Nova Lite invocation (cross-account STS)
 ├── db.mjs             # DynamoDB Document Client helpers
-├── tokenProxy.mjs     # OAuth2 token proxy for Quran.com
+├── tokenProxy.mjs     # OAuth2 token proxy for Quran Foundation
 └── utils/auth.mjs     # Demo auth helper
 tests/
 ├── unit/              # Unit tests
 └── property/          # Property-based tests (fast-check)
 template.yaml          # CloudFormation stack
 ```
-
-## License
-
-MIT

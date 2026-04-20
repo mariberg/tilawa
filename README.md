@@ -62,6 +62,36 @@ AWS Lambda (Core Orchestration)
 
 ---
 
+## 🎯 Hackathon Requirements Mapping
+
+This project fulfills the following technical requirements:
+
+### ☁️ Use at least one Quran Foundation Content API
+
+* chapters
+* verses by page
+* verses by chapter
+
+### 🤖 Use at least one Quran Foundation User API
+
+* reading sessions
+* activity days
+
+#### Current behaviour:
+
+Sessions are synced with the Quran Foundation API once a session is completed. This means a user's reading history is available to other apps using the same authentication.
+
+#### Future enhancement:
+
+In a future iteration, live session sync would allow a user to start a session in Tilawa, receive their preparation material, then open a Quran reading app and see that session already loaded as their "current session" — ready to read.
+
+### 🔐 Authentication
+
+* OAuth2 integration via Quran Foundation
+
+---
+
+
 ## 🚀 Live Demo
 
 👉 **Deployed App:** https://d1ecei39yukg0a.cloudfront.net/
@@ -116,44 +146,5 @@ Each module contains its own detailed README:
 * Quran Foundation OAuth2
 * Quran Foundation Content API
 * Quran Foundation User API
-
----
-
-## 🎯 Hackathon Requirements Mapping
-
-This project fulfills the following technical requirements:
-
-### ☁️ Use at least one Quran Foundation Content API
-
-* chapters
-* verses by page
-* verses by chapter
-
-### 🤖 Use at least one Quran Foundation User API
-
-* reading sessions
-* activity days
-
-#### Current behaviour:
-
-Sessions are synced with the Quran Foundation API once a session is completed. This means a user's reading history is available to other apps using the same authentication.
-
-#### Future enhancement:
-
-In a future iteration, live session sync would allow a user to start a session in Tilawa, receive their preparation material, then open a Quran reading app and see that session already loaded as their "current session" — ready to read.
-
-### 🔐 Authentication
-
-* OAuth2 integration via Quran Foundation
-
----
-
-
-## 🧭 How to run locally
-
-👉 See detailed instructions in:
-
-* [`frontend/README.md`](./frontend/README.md)
-* [`backend/README.md`](./backend/README.md)
 
 ---

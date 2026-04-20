@@ -18,9 +18,7 @@ const API_BASE_BY_ENV = {
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
-// Independent prelive token cache for Reading Sessions API
-let cachedPreliveToken = null;
-let preliveTokenExpiresAt = 0;
+
 
 /**
  * Fetches an OAuth2 access token using client credentials flow.
@@ -62,47 +60,7 @@ async function getAccessToken() {
   return cachedToken;
 }
 
-/**
- * Fetches an OAuth2 access token from the prelive auth server.
- * Always targets prelive regardless of QF_ENV.
- * Caches independently from the production token used by the content API.
- */
-async function getPreliveAccessToken() {
-  if (cachedPreliveToken && Date.now() < preliveTokenExpiresAt) {
-    return cachedPreliveToken;
-  }
 
-  const basicAuth = Buffer.from(
-    `${process.env.QF_PRELIVE_CLIENT_ID}:${process.env.QF_PRELIVE_CLIENT_SECRET}`
-  ).toString("base64");
-
-  const res = await fetch(
-    "https://prelive-oauth2.quran.foundation/oauth2/token",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        scope: "reading_session",
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error("Prelive OAuth token error:", res.status, errBody);
-    throw new Error(`Prelive OAuth token request failed: ${res.status}`);
-  }
-
-  const data = await res.json();
-  cachedPreliveToken = data.access_token;
-  // Refresh 60s before actual expiry to avoid edge cases
-  preliveTokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000;
-  return cachedPreliveToken;
-}
 
 /**
  * Makes an authenticated GET request to the Quran API and returns parsed verses.
