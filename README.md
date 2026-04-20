@@ -2,7 +2,7 @@
 
 _Your mind arrives, before your voice does._
 
-A context-aware preparation engine for Quranic recitation. Tilawa generates **personalized summaries and keywords** based on user level and preferences using AWS serverless architecture and Amazon Nova (LLM).
+Tilawa is a pre-recitation companion for Quran readers. Before you begin a session, it generates **personalized summaries and key concepts** — adapted to your Arabic level and familiarity. This is done using AWS serverless architecture and Amazon Nova (LLM).
 
 ---
 
@@ -11,14 +11,27 @@ A context-aware preparation engine for Quranic recitation. Tilawa generates **pe
 
 Tilawa enhances Quran reading by:
 
-* Providing **instant AI-generated summaries**
-* Extracting **key concepts and keywords**
-* Adapting explanations based on **user level**
-* Syncing reading sessions with Quran Foundation API
+**Before each session**:
+- AI-generated summaries of the pages you're about to read adapted to your familiarity level
+- Key vocabulary, adapted to your Arabic level (set once at account creation or modified in app settings)
+
+**Across sessions**:
+- Keeping track of the keywords you are already familiar with so that each session helps you to progress by showing only new keywords
+- Syncing reading sessions and activity days with the Quran Foundation API — your progress is portable across any app using the same authentication
+- Making your progress available across apps — so you can continue in a Quran reading app from exactly where Tilawa left off
 
 ---
 
-## Design Approach
+## 👤 User Experience
+
+1. **Account setup** — Select your Arabic level (beginner / intermediate / advanced)
+2. **Session start** — Rate your familiarity with the upcoming content for that session
+3. **AI preparation** — Tilawa generates a summary and keyword list calibrated to both inputs
+4. **Recitation** — Read with context already in mind
+
+---
+
+## 📐 Design Approach
 
 - **Mobile-First** — The app is designed primarily for mobile usage, with layouts and interactions optimized for small screens. This allows a seamless transition to a native mobile app in the future, which aligns with the primary use case of recitation on-the-go.
 
@@ -29,7 +42,7 @@ Tilawa enhances Quran reading by:
 The system is fully serverless and built on AWS.
 
 ```text id="xq8v1p"
-Frontend (Flutter web)
+Frontend (Flutter Web)
         ↓
 API Gateway
         ↓
@@ -51,7 +64,7 @@ AWS Lambda (Core Orchestration)
 
 ## 🚀 Live Demo
 
-👉 **Deployed App:** http://tilawa.s3-website-us-east-1.amazonaws.com
+👉 **Deployed App:** https://d1ecei39yukg0a.cloudfront.net/
 
 The app is fully deployed and ready to test.
 
@@ -86,7 +99,7 @@ Each module contains its own detailed README:
 
 ### Frontend
 
-* Flutter web
+* Flutter Web
 
 ### Backend
 
@@ -121,6 +134,14 @@ This project fulfills the following technical requirements:
 * reading sessions
 * activity days
 
+#### Current behaviour:
+
+Sessions are synced with the Quran Foundation API once a session is completed. This means a user's reading history is available to other apps using the same authentication.
+
+#### Future enhancement:
+
+In a future iteration, live session sync would allow a user to start a session in Tilawa, receive their preparation material, then open a Quran reading app and see that session already loaded as their "current session" — ready to read.
+
 ### 🔐 Authentication
 
 * OAuth2 integration via Quran Foundation
@@ -136,13 +157,3 @@ This project fulfills the following technical requirements:
 * [`backend/README.md`](./backend/README.md)
 
 ---
-
-## 🔮 Future Improvements
-
-* ???
-
----
-
-
-
-[def]: ./assets/tilawa_diagram.png
