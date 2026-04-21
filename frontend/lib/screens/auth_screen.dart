@@ -4,6 +4,7 @@ import 'dart:html' as html;
 import 'dart:js' as js;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../config.dart';
 import '../services/auth_service.dart';
 import '../services/level_service.dart';
@@ -143,6 +144,12 @@ class _AuthScreenState extends State<AuthScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
+              SvgPicture.asset(
+                'assets/tilawa_icon.svg',
+                width: 80,
+                height: 80,
+              ),
+              const SizedBox(height: 20),
               Text(
                 'Tilawa',
                 style: AppTextStyles.h1.copyWith(fontSize: 38),
