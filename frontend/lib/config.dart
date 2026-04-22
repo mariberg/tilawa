@@ -11,4 +11,8 @@ class AppConfig {
     'REDIRECT_URI',
     defaultValue: 'http://localhost:5000/auth/callback',
   );
+  static const String logoutRedirectUri = String.fromEnvironment(
+    'LOGOUT_REDIRECT_URI',
+    defaultValue: 'http://localhost:5000',
+  );
 }

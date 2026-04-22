@@ -13,6 +13,7 @@ import '../services/session_service.dart';
 import '../utils/date_utils.dart';
 import '../utils/page_utils.dart';
 import '../utils/preparing_message_controller.dart';
+import '../config.dart';
 import '../widgets/familiarity_pills.dart';
 import '../widgets/revisit_bottom_sheet.dart';
 import '../main.dart' show routeObserver;
@@ -414,7 +415,7 @@ class _EntryScreenState extends State<EntryScreen> with RouteAware {
                     icon: const Icon(Icons.logout, color: AppColors.textSecondary),
                     tooltip: 'Logout',
                     onPressed: () {
-                      final logoutUrl = _authService!.logout('http://localhost:5000');
+                      final logoutUrl = _authService!.logout(AppConfig.logoutRedirectUri);
                       // Redirect the current window to the OAuth2 logout URL.
                       // The provider will end the session and redirect back to the app.
                       js.context.callMethod('eval', ['window.location.replace("$logoutUrl")']);
