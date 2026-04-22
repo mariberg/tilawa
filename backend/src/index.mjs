@@ -70,8 +70,6 @@ export async function handler(event, context) {
       body: JSON.stringify({
         error: "Internal Server Error",
         message: "An unexpected error occurred",
-        // TODO: remove debug field before production
-        debug: error.message,
       }),
     };
   }

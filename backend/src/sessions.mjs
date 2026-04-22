@@ -71,7 +71,6 @@ async function fetchVerses(path) {
   const token = await getAccessToken();
 
   const url = `${apiBase}/content/api/v4/${path}?fields=text_uthmani&translations=131&per_page=50`;
-  console.log("Quran API request:", url);
   const res = await fetch(url, {
     headers: {
       "x-auth-token": token,
@@ -124,7 +123,6 @@ function parsePageRange(pages) {
  * @returns {Promise<{chapterNumber: number, verseNumber: number, startVerseKey: string, endVerseKey: string}>}
  */
 async function resolveChapterAndVerse(surah, pages) {
-  console.log("resolveChapterAndVerse called with:", { surah, pages });
   if (surah != null) {
     const verses = await fetchVersesForChapter(Number(surah));
     if (!verses || verses.length === 0) {
@@ -134,15 +132,12 @@ async function resolveChapterAndVerse(surah, pages) {
     const lastVerseNumber = Number(lastVerse.verseKey.split(":")[1]);
     const startVerseKey = `${Number(surah)}:1`;
     const endVerseKey = lastVerse.verseKey;
-    console.log("Using surah path:", { chapterNumber: Number(surah), verseNumber: lastVerseNumber, startVerseKey, endVerseKey });
     return { chapterNumber: Number(surah), verseNumber: lastVerseNumber, startVerseKey, endVerseKey };
   }
 
   const pageNumbers = parsePageRange(pages);
   const firstPage = pageNumbers[0];
   const lastPage = pageNumbers[pageNumbers.length - 1];
-  console.log("Using pages path, fetching verses for first page:", firstPage, "last page:", lastPage);
-
   const firstPageVerses = await fetchVersesForPage(firstPage);
   if (!firstPageVerses || firstPageVerses.length === 0) {
     throw new Error(`No verses returned for page ${firstPage}`);
@@ -193,7 +188,6 @@ async function syncReadingSession(chapterNumber, verseNumber, userAccessToken) {
 
   try {
     const requestBody = { chapterNumber, verseNumber };
-    console.log("Syncing reading session:", requestBody);
 
     const res = await fetch(
       "https://apis-prelive.quran.foundation/auth/v1/reading-sessions",
@@ -211,8 +205,6 @@ async function syncReadingSession(chapterNumber, verseNumber, userAccessToken) {
     if (!res.ok) {
       const errBody = await res.text();
       console.error("Reading Sessions API error:", res.status, errBody);
-    } else {
-      console.log("Reading session synced:", { chapterNumber, verseNumber });
     }
   } catch (err) {
     console.error("Reading session sync error:", err);
@@ -246,8 +238,6 @@ async function syncActivityDay(startVerseKey, endVerseKey, durationSecs, userAcc
       ranges: [`${startVerseKey}-${endVerseKey}`],
       mushafId: 4,
     };
-    console.log("Syncing activity day:", requestBody);
-
     const res = await fetch(
       "https://apis-prelive.quran.foundation/auth/v1/activity-days",
       {
@@ -264,8 +254,6 @@ async function syncActivityDay(startVerseKey, endVerseKey, durationSecs, userAcc
     if (!res.ok) {
       const errBody = await res.text();
       console.error("Activity Days API error:", res.status, errBody);
-    } else {
-      console.log("Activity day synced:", { startVerseKey, endVerseKey, durationSecs });
     }
   } catch (err) {
     console.error("Activity day sync error:", err);
@@ -365,8 +353,6 @@ export async function prepareSession(body, userId) {
     };
   }
 
-  console.log("prepareSession settings:", { arabicLevel, familiarity, userId });
-
   if (!pages && !surah) {
     return {
       statusCode: 400,
@@ -399,8 +385,6 @@ export async function prepareSession(body, userId) {
     allVerses = await fetchVersesForChapter(surah);
     passageLabel = `Surah ${surah}`;
   }
-
-  console.log(`Fetched ${allVerses.length} verses for ${passageLabel}`);
 
   // Build passage content for the prompt
   const passageContent = allVerses
@@ -515,13 +499,6 @@ VALIDATION RULES:
 
   // Filter 2: remove user's known keywords from DB
   const finalKeywords = filterKnownKeywords(afterExclusions, knownArabicSet).slice(0, 20);
-
-  console.log("prepareSession result:", {
-    arabicLevel,
-    familiarity,
-    keywordCount: finalKeywords.length,
-    keywords: finalKeywords.map(k => ({ arabic: k.arabic, type: k.type })),
-  });
 
   return {
     statusCode: 200,
