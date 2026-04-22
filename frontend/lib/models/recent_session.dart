@@ -2,23 +2,20 @@ class RecentSession {
   final String sessionId;
   final String? pages;
   final int? surah;
-  final String feeling;
+  final String? feeling;
   final DateTime createdAt;
 
   const RecentSession({
     required this.sessionId,
     this.pages,
     this.surah,
-    required this.feeling,
+    this.feeling,
     required this.createdAt,
   });
 
   factory RecentSession.fromJson(Map<String, dynamic> json) {
     if (!json.containsKey('sessionId') || json['sessionId'] == null) {
       throw FormatException('Missing required field: sessionId');
-    }
-    if (!json.containsKey('feeling') || json['feeling'] == null) {
-      throw FormatException('Missing required field: feeling');
     }
     if (!json.containsKey('createdAt') || json['createdAt'] == null) {
       throw FormatException('Missing required field: createdAt');
@@ -31,11 +28,14 @@ class RecentSession {
       throw FormatException('Either pages or surah must be present');
     }
 
+    final rawFeeling = json['feeling'] as String?;
+    final feeling = (rawFeeling == 'null') ? null : rawFeeling;
+
     return RecentSession(
       sessionId: json['sessionId'] as String,
       pages: pages,
       surah: surah,
-      feeling: json['feeling'] as String,
+      feeling: feeling,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
@@ -45,7 +45,7 @@ class RecentSession {
       'sessionId': sessionId,
       if (pages != null) 'pages': pages,
       if (surah != null) 'surah': surah,
-      'feeling': feeling,
+      if (feeling != null) 'feeling': feeling,
       'createdAt': createdAt.toIso8601String(),
     };
   }
